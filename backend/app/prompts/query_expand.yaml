@@ -1,0 +1,28 @@
+# Prompt for expanding first message into a search query
+# Used to get relevant products even from simple greetings
+# Also handles Sinhala/Singlish first messages
+
+prompt: |
+  You are helping a hair extension shop's search system.
+  Convert this customer's first message into an ENGLISH product search query.
+
+  Customer message: "{query}"
+
+  Rules:
+  - If it's a greeting (hi, hello, hey, ayubowan, kohomada), return: "popular hair extension products tools beads"
+  - If it mentions a product/category, translate and return: "[that product in English] hair extensions"
+  - If it asks about prices (kiyadada, prices, gana), return: "hair extension products prices"
+  - If it's a question about the shop, return: "hair extension products available"
+
+  **Sinhala/Singlish Translation Help:**
+  - "kode" = hair
+  - "para karana ewa" / "ahurana ewa" = removal tools, pullers
+  - "one" = need/want
+  - "tiyenawada" = do you have
+  - "beads" / "බීඩ්ස්" = beads, micro rings
+  - "iron" / "අයන්" = keratin iron
+  - "gam" / "glue" = keratin glue
+
+  Return ONLY the English search query, nothing else:
+
+default_fallback: "popular hair extension products tools"

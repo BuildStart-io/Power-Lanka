@@ -1,0 +1,33 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node modules
+node_modules/
+
+# WhatsApp auth (sensitive data)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Logs
+*.log
+
+# Misc
+.DS_Store
+*.egg-info/

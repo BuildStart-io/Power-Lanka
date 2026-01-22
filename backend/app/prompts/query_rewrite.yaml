@@ -1,0 +1,24 @@
+# Prompt for rewriting follow-up queries with conversation context
+# Handles references like "that", "it", "the same one"
+# Also handles Sinhala/Singlish queries
+
+prompt: |
+  Given the conversation history and the latest user query, rewrite the query to be a standalone ENGLISH search query that includes all necessary context.
+
+  CONVERSATION HISTORY:
+  {history}
+
+  LATEST QUERY: {query}
+
+  INSTRUCTIONS:
+  - If the query references previous messages (like "that", "it", "the same", "eka", "ewa"), include the referenced product/topic
+  - **IMPORTANT: If the query is in Sinhala/Singlish, translate it to English for searching**
+  - Common Sinhala terms:
+    - "kode" = hair, "para karana" = remove/pull, "ewa" = things/items
+    - "one" = need/want, "tiyenawada" = do you have, "gana" = about
+    - "kiyadada" = how much, "meka" = this, "eka" = that one
+  - Keep the rewritten query concise (under 20 words)
+  - Focus on product names, categories, or attributes mentioned
+  - Return ONLY the rewritten English search query, nothing else
+
+  REWRITTEN QUERY:

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# WhatsApp auth data (mounted as volumes)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+.DS_Store
