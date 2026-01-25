@@ -21,6 +21,15 @@
         class="product-card"
         :class="{ inactive: product.available === 'No' }"
       >
+        <div class="product-image-container">
+            <img 
+              v-if="product.image_paths" 
+              :src="`${API_BASE}/media/${product.image_paths.split(',')[0]}`" 
+              alt="Product Image"
+              class="product-thumb"
+            />
+            <div v-else class="no-image-placeholder">📦</div>
+        </div>
         <div class="product-header">
           <div class="product-info">
             <h3>{{ product.product_name }}</h3>
@@ -94,6 +103,14 @@
               <option value="No">Out of Stock</option>
             </select>
           </div>
+          <div class="form-group">
+            <label>Product Image</label>
+            <input 
+              type="file" 
+              accept="image/*"
+              @change="handleFileSelect"
+            />
+          </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" @click="closeModal">Cancel</button>
             <button type="submit" class="btn btn-primary" :disabled="saving">
@@ -123,7 +140,8 @@ export default {
         variant: '',
         price_lkr: 0,
         available: 'Yes'
-      }
+      },
+      selectedFile: null
     }
   },
   async mounted() {
@@ -133,12 +151,20 @@ export default {
     async loadProducts() {
       this.loading = true
       try {
+        console.log(`Fetching from: ${API_BASE}/admin/products/`) // Debug log
         const res = await fetch(`${API_BASE}/admin/products/`)
+        console.log('Response status:', res.status) // Debug log
+        
         if (res.ok) {
           this.products = await res.json()
+        } else {
+             const text = await res.text()
+             console.error('Fetch failed:', text)
+             // alert(`Failed to load products: ${res.status} ${text}`) 
         }
       } catch (err) {
         console.error('Failed to load products:', err)
+        // alert(`Network Error: ${err.message}`)
       } finally {
         this.loading = false
       }
@@ -151,6 +177,7 @@ export default {
         price_lkr: 0,
         available: 'Yes'
       }
+      this.selectedFile = null
       this.showModal = true
     },
     editProduct(product) {
@@ -162,34 +189,53 @@ export default {
         price_lkr: product.price_lkr,
         available: product.available
       }
+      this.selectedFile = null
       this.showModal = true
     },
     closeModal() {
       this.showModal = false
       this.editingId = null
     },
-    async saveProduct() {
-      this.saving = true
-      try {
-        const res = await fetch(`${API_BASE}/admin/products/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.form)
-        })
-        
-        if (res.ok) {
-          await this.loadProducts()
-          this.closeModal()
-        } else {
-          const err = await res.json()
-          alert(err.detail || 'Failed to save product')
-        }
-      } catch (err) {
-        console.error('Error saving product:', err)
-        alert('Check backend connection')
-      } finally {
-        this.saving = false
+    handleFileSelect(e) {
+      const file = e.target.files[0]
+      if (file) {
+        this.selectedFile = file
       }
+    },
+    async saveProduct() {
+        this.saving = true
+        try {
+            const formData = new FormData()
+            formData.append('product_name', this.form.product_name)
+            formData.append('price_lkr', this.form.price_lkr)
+            formData.append('available', this.form.available)
+            
+            if (this.form.variant) formData.append('variant', this.form.variant)
+            if (this.editingId) formData.append('id', this.editingId)
+            
+            if (this.selectedFile) {
+                formData.append('image', this.selectedFile)
+            }
+
+            const res = await fetch(`${API_BASE}/admin/products/`, {
+                method: 'POST',
+                // No Content-Type header needed for FormData; browser sets it with boundary
+                body: formData
+            })
+            
+            if (res.ok) {
+                await this.loadProducts()
+                this.closeModal()
+            } else {
+                const err = await res.json()
+                alert(err.detail || 'Failed to save product')
+            }
+        } catch (err) {
+            console.error('Error saving product:', err)
+            alert('Check backend connection')
+        } finally {
+            this.saving = false
+        }
     },
     async toggleAvailability(product) {
       try {
@@ -258,6 +304,29 @@ export default {
 .product-card.inactive {
   opacity: 0.7;
   background: hsl(var(--muted) / 0.05);
+}
+
+.product-image-container {
+  width: 100%;
+  height: 160px;
+  background: hsl(var(--muted) / 0.1);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.product-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.no-image-placeholder {
+  font-size: 3rem;
+  opacity: 0.5;
 }
 
 .product-header {

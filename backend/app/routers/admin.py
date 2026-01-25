@@ -112,10 +112,20 @@ async def get_dashboard_stat(db: Session = Depends(get_db)):
 @router.get("/product")
 async def get_featured_product(db: Session = Depends(get_db)):
     """Get the featured product for the dashboard."""
-    # Just return the first product or a dummy one
-    product = db.query(Product).first()
+    display_product = None
     
-    if not product:
+    # Try to find a logical "featured" product
+    # Priority 1: A product with an image
+    # Priority 2: Any product
+    
+    product_with_image = db.query(Product).filter(Product.image_paths != None, Product.image_paths != "").first()
+    
+    if product_with_image:
+        display_product = product_with_image
+    else:
+        display_product = db.query(Product).first()
+    
+    if not display_product:
         # Return a placeholder if DB is empty
         return {
             "product": {
@@ -126,13 +136,16 @@ async def get_featured_product(db: Session = Depends(get_db)):
             },
             "delivery_charge": 350
         }
+    
+    # Helper to get first image if comma separated
+    images = display_product.image_paths if display_product.image_paths else ""
         
     return {
         "product": {
-            "name": product.product_name,
-            "price": product.price_lkr,
-            "name_si": product.variant or "", # Using variant as subtext for now
-            "image_paths": "placeholder.png" # We need to handle images or add column
+            "name": display_product.product_name,
+            "price": display_product.price_lkr,
+            "name_si": display_product.variant or "", 
+            "image_paths": images 
         },
         "delivery_charge": 350
     }
@@ -143,24 +156,75 @@ import shutil
 import os
 
 @router.post("/product/images")
-async def upload_product_image(file: UploadFile = File(...)):
-    """Upload a product image."""
+async def upload_product_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload a product image and attach it to the featured product."""
     try:
-        file_path = f"media/{file.filename}"
+        # Create media directory if not exists
+        media_dir = Path("media")
+        media_dir.mkdir(exist_ok=True)
+        
+        # Save file
+        file_extension = Path(file.filename).suffix
+        # Use timestamp to avoid collisions
+        unique_filename = f"featured_{int(datetime.utcnow().timestamp())}{file_extension}"
+        file_path = media_dir / unique_filename
+        
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        return {"filename": file.filename}
+            
+        # Find the product to attach to (same logic as get_featured_product)
+        # Priority 1: A product with an image (likely the one we are viewing)
+        # Priority 2: Any product (if adding first image)
+        product = db.query(Product).filter(Product.image_paths != None, Product.image_paths != "").first()
+        if not product:
+            product = db.query(Product).first()
+            
+        if product:
+            if product.image_paths:
+                product.image_paths = f"{product.image_paths},{unique_filename}"
+            else:
+                product.image_paths = unique_filename
+            db.commit()
+            db.refresh(product)
+            
+        return {"filename": unique_filename}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/product/images/{filename}")
-async def delete_product_image(filename: str):
-    """Delete a product image."""
+async def delete_product_image(
+    filename: str,
+    db: Session = Depends(get_db)
+):
+    """Delete a product image and remove reference from DB."""
     try:
-        file_path = f"media/{filename}"
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            return {"message": "Image deleted"}
-        raise HTTPException(status_code=404, detail="Image not found")
+        # Remove from disk
+        file_path = Path("media") / filename
+        if file_path.exists():
+            try:
+                os.remove(file_path)
+            except Exception:
+                pass
+
+        # Remove string reference from ANY product that has it
+        # Since we don't have product_id, we search (inefficient but safe for small catalog)
+        products = db.query(Product).filter(Product.image_paths.contains(filename)).all()
+        
+        for product in products:
+            if not product.image_paths:
+                continue
+                
+            current_paths = [p.strip() for p in product.image_paths.split(',') if p.strip()]
+            if filename in current_paths:
+                current_paths.remove(filename)
+                product.image_paths = ",".join(current_paths)
+                db.add(product) # Mark for update
+                
+        db.commit()
+            
+        return {"message": "Image deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

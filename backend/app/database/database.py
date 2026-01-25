@@ -66,6 +66,7 @@ class Product(Base):
     variant = Column(String, nullable=True)
     price_lkr = Column(Float, default=0.0)
     available = Column(String, default="Yes")
+    image_paths = Column(Text, nullable=True)
     last_updated = Column(DateTime, default=datetime.utcnow)
 
 
