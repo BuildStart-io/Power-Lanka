@@ -7,7 +7,13 @@ import logging
 import traceback
 
 from .config import get_settings
-from .routers import documents_router, chat_router, whatsapp_router
+from .routers import (
+    documents_router,
+    chat_router,
+    whatsapp_router,
+    admin_router,
+    admin_products_router,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -52,7 +58,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,6 +77,8 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 app.include_router(documents_router)
 app.include_router(chat_router)
 app.include_router(whatsapp_router)
+app.include_router(admin_router)
+app.include_router(admin_products_router)
 
 
 @app.get("/")

@@ -56,6 +56,32 @@ class WhatsAppSession(Base):
     last_message_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Product(Base):
+    """Product catalog table for dynamic data (price, availability)."""
+
+    __tablename__ = "products"
+
+    id = Column(String, primary_key=True)  # composite: name_variant
+    product_name = Column(String, nullable=False, index=True)
+    variant = Column(String, nullable=True)
+    price_lkr = Column(Float, default=0.0)
+    available = Column(String, default="Yes")
+    last_updated = Column(DateTime, default=datetime.utcnow)
+
+
+class User(Base):
+    """Admin users table."""
+
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 

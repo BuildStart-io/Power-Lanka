@@ -1,79 +1,82 @@
-import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted
-from typing import Union
 import logging
-
+import time
+from typing import List
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
-
 class EmbeddingService:
-    """Service for generating embeddings using Gemini."""
+    """Service for generating embeddings using OpenRouter (OpenAI Compatible)."""
 
     def __init__(self):
         self.settings = get_settings()
-        genai.configure(api_key=self.settings.gemini_api_key)
-        self.model = self.settings.gemini_embedding_model
-        # Hardcoded backup key provided by user for emergency fallback
-        self.backup_api_key = "AIzaSyAp6dq-VqjuTtmLeoTcYV5pSRLrnDMsUio"
+        from openai import OpenAI
+        
+        # Use OpenRouter for embeddings too
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.settings.openrouter_api_key,
+        )
+        self.model_name = "text-embedding-3-small"
 
-    def _embed_with_fallback(self, content: str, task_type: str) -> dict:
-        """Generate embedding with fallback to backup API key on 429 errors."""
+    def generate_embedding(self, text: str) -> List[float]:
+        """Generate embedding for a single text using OpenAI."""
         try:
-            return genai.embed_content(
-                model=f"models/{self.model}",
-                content=content,
-                task_type=task_type,
+            # Simple retry logic
+            for _ in range(3):
+                try:
+                    # Clean text slightly (remove newlines usually helps)
+                    clean_text = text.replace("\n", " ")
+                    response = self.client.embeddings.create(
+                        input=clean_text,
+                        model=self.model_name
+                    )
+                    return response.data[0].embedding
+                except Exception as e:
+                    logger.warning(f"Embedding failed, retrying: {e}")
+                    time.sleep(1)
+            
+            # Final attempt
+            response = self.client.embeddings.create(
+                input=text.replace("\n", " "),
+                model=self.model_name
             )
-        except ResourceExhausted:
-            logger.warning("Primary API key exhausted (429) during embedding. Switching to backup key.")
-            try:
-                # Re-configure with backup key
-                genai.configure(api_key=self.backup_api_key)
-                # Retry embedding
-                return genai.embed_content(
-                    model=f"models/{self.model}",
-                    content=content,
-                    task_type=task_type,
-                )
-            except Exception as e:
-                logger.error(f"Backup key failed during embedding: {str(e)}")
-                # Revert to primary key configuration
-                genai.configure(api_key=self.settings.gemini_api_key)
-                raise e
+            return response.data[0].embedding
+            
+        except Exception as e:
+            logger.error(f"Failed to generate embedding: {str(e)}")
+            # Return zero vector of correct dimension (1536)
+            return [0.0] * 1536
 
-    def generate_embedding(self, text: str) -> list[float]:
-        """Generate embedding for a single text."""
-        result = self._embed_with_fallback(
-            content=text,
-            task_type="retrieval_document",
-        )
-        return result["embedding"]
-
-    def generate_query_embedding(self, query: str) -> list[float]:
-        """Generate embedding for a query (optimized for retrieval)."""
-        result = self._embed_with_fallback(
-            content=query,
-            task_type="retrieval_query",
-        )
-        return result["embedding"]
+    def generate_query_embedding(self, query: str) -> List[float]:
+        """Generate embedding for search query."""
+        return self.generate_embedding(query)
 
     def generate_embeddings_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts."""
         embeddings = []
-        # Process in batches to avoid rate limits
-        batch_size = 100
-
+        batch_size = 50  # Conservative batching
+        
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            for text in batch:
-                embedding = self.generate_embedding(text)
-                embeddings.append(embedding)
-
+            try:
+                # OpenAI supports batting
+                clean_batch = [t.replace("\n", " ") for t in batch]
+                response = self.client.embeddings.create(
+                    input=clean_batch,
+                    model=self.model_name
+                )
+                # Sort by index to be safe, though usually preserves order
+                data = sorted(response.data, key=lambda x: x.index)
+                embeddings.extend([d.embedding for d in data])
+            except Exception as e:
+                logger.error(f"Batch embedding failed: {e}")
+                # Fallback to individual
+                for text in batch:
+                    embeddings.append(self.generate_embedding(text))
+                    
         return embeddings
 
     def get_embedding_dimension(self) -> int:
         """Return the dimension of embeddings."""
-        # text-embedding-004 produces 768-dimensional embeddings
-        return 768
+        return 1536

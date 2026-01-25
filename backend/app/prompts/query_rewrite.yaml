@@ -14,7 +14,8 @@ prompt: |
   - If the query references previous messages (like "that", "it", "the same", "eka", "ewa"), include the referenced product/topic
   - **IMPORTANT: If the query is in Sinhala/Singlish, translate it to English for searching**
   - Common Sinhala terms:
-    - "kode" = hair, "para karana" = remove/pull, "ewa" = things/items
+    - "masso" / "messan" = flies, fly killer
+    - "kunu" = dirt/stains, "ganda" = smell
     - "one" = need/want, "tiyenawada" = do you have, "gana" = about
     - "kiyadada" = how much, "meka" = this, "eka" = that one
   - Keep the rewritten query concise (under 20 words)

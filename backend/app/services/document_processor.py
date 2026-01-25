@@ -152,6 +152,13 @@ class DocumentProcessor:
         with open(file_path, "r", encoding="utf-8") as f:
             full_text = f.read()
 
+        # Attempt to parse Q&A format first
+        products = self._parse_qa_from_text(full_text, file_path.stem)
+        
+        if products:
+             return products
+
+        # Fallback to chunking
         chunks = self._chunk_text(full_text)
 
         products = []
@@ -171,6 +178,34 @@ class DocumentProcessor:
                 }
             )
 
+        return products
+
+    def _parse_qa_from_text(self, text: str, source_name: str) -> list[dict]:
+        """Parse Q&A format typical in FAQ files."""
+        import re
+        
+        # Regex to find "Q1:", "Q:", followed by text, then "A:" followed by text
+        # Groups: 1=Question Label (e.g. Q1), 2=Question Text, 3=Answer Text
+        # We use dotall to capture multi-line text, but need to be careful not to eat the next Q
+        qa_pattern = re.compile(r'(Q\d*|Q):?\s+(.*?)\s*\n?A:\s+(.*?)(?=\nQ\d*:|\nQ:|$)', re.DOTALL | re.IGNORECASE)
+        
+        matches = qa_pattern.findall(text)
+        
+        products = []
+        for _, question, answer in matches:
+            products.append({
+                "category": "FAQ",
+                "sub_category": source_name, # e.g. "data" or "Fly Killer"
+                "sub_sub_category": "",
+                "product_name": question.strip(),
+                "variant": "",
+                "size_weight": "",
+                "price_lkr": 0,
+                "description": answer.strip(),
+                "available": "Yes",
+                "tags": "faq, info",
+            })
+            
         return products
 
     def _chunk_text(
@@ -208,8 +243,9 @@ class DocumentProcessor:
             parts.append(f"Variant: {product['variant']}")
         if product.get("size_weight"):
             parts.append(f"Size/Weight: {product['size_weight']}")
-        if product.get("price_lkr"):
-            parts.append(f"Price: RS.{product['price_lkr']}")
+        # Exclude dynamic data (price, available) from embeddings to prevent hallucinations
+        # if product.get("price_lkr"):
+        #     parts.append(f"Price: RS.{product['price_lkr']}")
         if product.get("description"):
             parts.append(f"Description: {product['description']}")
         if product.get("tags"):

@@ -74,9 +74,9 @@ class VectorStoreService:
                         "product_name": product.get("product_name", ""),
                         "variant": product.get("variant", ""),
                         "size_weight": product.get("size_weight", ""),
-                        "price_lkr": product.get("price_lkr", 0),
+                        # "price_lkr": product.get("price_lkr", 0),  <-- REMOVED
                         "description": product.get("description", ""),
-                        "available": product.get("available", "Yes"),
+                        # "available": product.get("available", "Yes"), <-- REMOVED
                         "tags": product.get("tags", ""),
                         "embedding_text": embedding_text,
                     },

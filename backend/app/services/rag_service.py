@@ -24,13 +24,19 @@ class RAGService:
 
     def __init__(self):
         self.settings = get_settings()
+        # Keep GenAI for embeddings (if used elsewhere) or legacy references
         genai.configure(api_key=self.settings.gemini_api_key)
-        self.model = genai.GenerativeModel(self.settings.gemini_model)
+        
+        # Initialize OpenRouter Client
+        from openai import OpenAI
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.settings.openrouter_api_key,
+        )
+        self.model_name = self.settings.openrouter_model
+        
         self.vector_store = VectorStoreService()
         self.top_k = self.settings.top_k_results
-        # Hardcoded backup key provided by user for emergency fallback
-        self.backup_api_key = "AIzaSyAp6dq-VqjuTtmLeoTcYV5pSRLrnDMsUio"
-        # Load categories from YAML
         self.categories = get_categories()
 
     def _get_conversation_state(self, conversation_history: Optional[list[dict]]) -> dict:
@@ -51,23 +57,23 @@ class RAGService:
         }
 
     def _generate_with_fallback(self, prompt: str):
-        """Generate content with fallback to backup API key on 429 errors."""
+        """Generate content using OpenRouter."""
         try:
-            return self.model.generate_content(prompt)
-        except ResourceExhausted:
-            logger.warning("Primary API key exhausted (429). Switching to backup key.")
-            try:
-                # Re-configure with backup key
-                genai.configure(api_key=self.backup_api_key)
-                # Re-initialize model to ensure it uses new credentials
-                self.model = genai.GenerativeModel(self.settings.gemini_model)
-                # Retry generation
-                return self.model.generate_content(prompt)
-            except Exception as e:
-                logger.error(f"Backup key failed: {str(e)}")
-                # Revert to primary key configuration for next request
-                genai.configure(api_key=self.settings.gemini_api_key)
-                raise e
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            # Wrap response to match old interface somewhat or return text directly
+            # The old code expects an object with .text attribute
+            class ResponseWrapper:
+                def __init__(self, content):
+                    self.text = content
+            
+            return ResponseWrapper(response.choices[0].message.content)
+
+        except Exception as e:
+            logger.error(f"OpenRouter generation failed: {str(e)}")
+            raise e
 
     def _validate_script_purity(self, text: str) -> tuple[bool, str]:
         """Check if response contains only Sinhala + English characters.
@@ -260,32 +266,58 @@ class RAGService:
         }
 
     def _build_context(self, results: list[dict]) -> str:
-        """Build context string from search results."""
+        """Build context string from search results with live DB lookup."""
         if not results:
             return "No specific products matched. Show general catalog information."
 
+        # Import here to avoid circular dependencies
+        from ..database.database import SessionLocal, Product
+
+        db = SessionLocal()
         context_parts = []
-        for i, result in enumerate(results, 1):
-            parts = [f"{i}. {result['product_name']}"]
+        
+        try:
+            for i, result in enumerate(results, 1):
+                p_name = result.get('product_name', "").strip()
+                p_variant = result.get('variant', "").strip()
+                
+                # Default "static" values (fallback)
+                price = result.get('price_lkr', 0)
+                available = result.get('available', 'Unknown')
 
-            if result.get("category"):
-                parts.append(f"   Category: {result['category']}")
-            if result.get("sub_category"):
-                parts.append(f"   Sub-category: {result['sub_category']}")
-            if result.get("sub_sub_category"):
-                parts.append(f"   Type: {result['sub_sub_category']}")
-            if result.get("variant"):
-                parts.append(f"   Variant: {result['variant']}")
-            if result.get("size_weight"):
-                parts.append(f"   Size/Weight: {result['size_weight']}")
-            if result.get("price_lkr"):
-                parts.append(f"   Price: RS.{result['price_lkr']}")
-            if result.get("description"):
-                parts.append(f"   Description: {result['description']}")
-            if result.get("available"):
-                parts.append(f"   Available: {result['available']}")
+                # Attempt Live Lookup
+                if p_name:
+                    p_id = f"{p_name}_{p_variant}" if p_variant else p_name
+                    db_product = db.query(Product).filter(Product.id == p_id).first()
+                    
+                    if db_product:
+                        price = db_product.price_lkr
+                        available = db_product.available
+                        # logger.info(f"Live Price Found for {p_id}: {price}")
 
-            context_parts.append("\n".join(parts))
+                parts = [f"{i}. {p_name}"]
+
+                if result.get("category"):
+                    parts.append(f"   Category: {result['category']}")
+                if result.get("sub_category"):
+                    parts.append(f"   Sub-category: {result['sub_category']}")
+                if result.get("sub_sub_category"):
+                    parts.append(f"   Type: {result['sub_sub_category']}")
+                if p_variant:
+                    parts.append(f"   Variant: {p_variant}")
+                if result.get("size_weight"):
+                    parts.append(f"   Size/Weight: {result['size_weight']}")
+                
+                # Use the LIVE variables
+                parts.append(f"   Price: RS.{price}")
+                parts.append(f"   Available: {available}")
+                    
+                if result.get("description"):
+                    parts.append(f"   Description: {result['description']}")
+
+                context_parts.append("\n".join(parts))
+        finally:
+            db.close()
 
         return "\n\n".join(context_parts)
 

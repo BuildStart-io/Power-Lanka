@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-flash-lite-latest"
     gemini_embedding_model: str = "text-embedding-004"
 
+    # OpenRouter
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "google/gemini-2.0-flash-001"
+
     # Qdrant
     qdrant_url: str
     qdrant_api_key: str

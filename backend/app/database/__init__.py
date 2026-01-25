@@ -5,6 +5,8 @@ from .database import (
     Document,
     ConversationMessage,
     WhatsAppSession,
+    Product,
+    User,
     get_db,
 )
 
@@ -15,5 +17,7 @@ __all__ = [
     "Document",
     "ConversationMessage",
     "WhatsAppSession",
+    "Product",
+    "User",
     "get_db",
 ]

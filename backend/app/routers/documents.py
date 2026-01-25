@@ -62,7 +62,43 @@ async def upload_document(
         vector_store = VectorStoreService()
         vector_store.add_products(products, document_id)
 
-        # Save to database
+        # Upsert products into SQLite (Dynamic Data)
+        from ..database import Product
+        from datetime import datetime
+        
+        for p in products:
+            p_name = p.get("product_name", "").strip()
+            p_variant = p.get("variant", "").strip()
+            
+            # Create composite ID: "ProductName_Variant" or just "ProductName"
+            if p_variant:
+                p_id = f"{p_name}_{p_variant}"
+            else:
+                p_id = p_name
+            
+            # Normalize ID for consistency
+            p_id = p_id.lower().replace(" ", "_")
+                
+            # Check if exists
+            existing_product = db.query(Product).filter(Product.id == p_id).first()
+            
+            if existing_product:
+                # Update
+                existing_product.price_lkr = p.get("price_lkr", 0.0)
+                existing_product.available = p.get("available", "Yes")
+                existing_product.last_updated = datetime.utcnow()
+            else:
+                # Create
+                new_product = Product(
+                    id=p_id,
+                    product_name=p_name,
+                    variant=p_variant,
+                    price_lkr=p.get("price_lkr", 0.0),
+                    available=p.get("available", "Yes"),
+                )
+                db.add(new_product)
+        
+        # Save to database (Document record)
         doc = Document(
             id=document_id,
             filename=file.filename,
