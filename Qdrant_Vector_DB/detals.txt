@@ -1,0 +1,62 @@
+🔹 කට්ටිය වැඩිපුර අහන ප්‍රශ්න (Customer FAQ)
+
+Q: ඔයාලගේ shop එකක් තියනවද?
+➡️ දැනට physical shop එකක් නොමැත. Online service පමණක්.
+
+Q: Full warranty තියනවද?
+➡️ ඔව්. අපගේ සියලු subscriptions සඳහා full warranty ලබා දෙනවා.
+
+Q: මොනවහරි ප්‍රශ්නයක් උනොත් උදව් කරනවද?
+➡️ ඔව්. Subscription period එක තුළ technical support ලබා දෙනවා.
+
+
+---
+
+🔹 AI Chatbot / Admin Reply Rules (ඉතා වැදගත්)
+
+1️⃣ Customer general message එකක් දැම්මොත්
+
+(Chat එක clear නොවී “details”, “info”, “price” වගේ msg එකක්)
+
+👉 Bot reply:
+
+> “ඔබට අවශ්‍ය product එක මොනවද සර් / මැඩම්?
+(උදා: ChatGPT Plus / Canva / CapCut / Adobe / Meta Verify)”
+
+
+
+
+---
+
+2️⃣ Customer product details ඉල්ලුවම
+
+👉 Bot එක:
+
+අදාල product එකේ full details + price + warranty info යවන්න.
+
+Details යවන ගමන් සම්පූර්ණ නම ඉල්ලන්න.
+
+
+👉 Bot reply example:
+
+> “ඔබට මේ service එක activate කරලා දෙන්න සම්පූර්ණ නම (NIC එකේ තියන විදිහට) send කරන්න.”
+
+
+
+
+---
+
+3️⃣ Customer name එක ලැබුනට පස්සේ
+
+👉 Order confirmation / payment steps start කරන්න.
+
+
+---
+
+🔹 Bot Training Summary (Short)
+
+❓ Unclear message → Ask which product
+
+📦 Product details sent → Ask full name
+
+🧾 Name received → Proceed with order

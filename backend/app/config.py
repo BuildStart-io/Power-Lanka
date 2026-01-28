@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     data_dir: str = "data"
     max_file_size_mb: int = 5
 
+    # WASender Configuration
+    wasender_api_url: str = "https://www.wasenderapi.com/api/send-message"
+    whatsapp_api_bearer_token: str | None = None
+
     # RAG Settings
     chunk_size: int = 500
     chunk_overlap: int = 50

@@ -27,16 +27,16 @@ class RAGService:
 
     def __init__(self):
         self.settings = get_settings()
-        # Keep GenAI for embeddings (if used elsewhere) or legacy references
-        genai.configure(api_key=self.settings.gemini_api_key)
         
-        # Initialize OpenRouter Client
-        from openai import OpenAI
-        self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=self.settings.openrouter_api_key,
-        )
-        self.model_name = self.settings.openrouter_model
+        # Configure Gemini
+        if not self.settings.gemini_api_key:
+            logger.warning("GEMINI_API_KEY not set")
+        else:
+            genai.configure(api_key=self.settings.gemini_api_key)
+            
+        # Use Gemini Model
+        self.model_name = self.settings.gemini_model
+        self.model = genai.GenerativeModel(self.model_name)
         
         self.vector_store = VectorStoreService()
         self.top_k = self.settings.top_k_results
@@ -60,22 +60,21 @@ class RAGService:
         }
 
     def _generate_with_fallback(self, prompt: str):
-        """Generate content using OpenRouter."""
+        """Generate content using Gemini."""
         try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            # Wrap response to match old interface somewhat or return text directly
-            # The old code expects an object with .text attribute
+            # Gemini generation
+            response = self.model.generate_content(prompt)
+            
+            # Wrap response to match interface expected by caller
             class ResponseWrapper:
                 def __init__(self, content):
                     self.text = content
             
-            return ResponseWrapper(response.choices[0].message.content)
+            return ResponseWrapper(response.text)
 
         except Exception as e:
-            logger.error(f"OpenRouter generation failed: {str(e)}")
+            logger.error(f"Gemini generation failed: {str(e)}")
+            # Raise or return fallback? Raising allows retry/handling upstream
             raise e
 
     def _validate_script_purity(self, text: str) -> tuple[bool, str]:

@@ -1,31 +1,92 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
+import logging
 
 from ..database import get_db, ConversationMessage, WhatsAppSession
 from ..services import RAGService
+from ..services.wasender_service import send_wasender_message_background
 from ..models import WhatsAppMessage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
 
 
-@router.post("/message")
-async def handle_whatsapp_message(
-    request: WhatsAppMessage, db: Session = Depends(get_db)
+@router.post("/webhook")
+async def handle_wasender_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ):
-    """Handle incoming WhatsApp message - called by Node.js service."""
+    """
+    Handle incoming WhatsApp messages from WASender webhook.
+    
+    Compatible with both legacy and new WASender payload formats.
+    """
+    try:
+        payload = await request.json()
+        
+        # Extract user ID (phone number) and message
+        user_id = None
+        message_text = None
+        
+        # Try legacy format
+        if "fromNumber" in payload:
+            user_id = payload.get("fromNumber")
+            message_text = payload.get("message") or payload.get("body")
+            
+        # Try WhatsApp-style format
+        elif "data" in payload:
+            msg_data = payload.get("data", {}).get("messages", {})
+            # senderPn or cleanedSenderPn
+            key_data = msg_data.get("key", {})
+            user_id = key_data.get("cleanedSenderPn") or key_data.get("senderPn")
+            
+            # Message body
+            message_text = msg_data.get("messageBody") or \
+                          msg_data.get("message", {}).get("extendedTextMessage", {}).get("text")
+        
+        if not user_id or not message_text:
+            logger.warning(f"[Webhook] Invalid payload structure: {payload}")
+            return {"status": "ignored", "reason": "missing_fields"}
+            
+        # Standardize phone number
+        phone_number = str(user_id).strip()
+        message = str(message_text).strip()
+        
+        logger.info(f"[Webhook] Received message from {phone_number}: {message[:50]}...")
+        
+        # Process message properly
+        return await process_message_internal(phone_number, message, db, background_tasks)
+        
+    except Exception as e:
+        logger.error(f"[Webhook] Error processing webhook: {str(e)}", exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
+async def process_message_internal(
+    phone_number: str, 
+    message: str, 
+    db: Session,
+    background_tasks: BackgroundTasks
+):
+    """
+    Internal logic to process message and generate response.
+    Reused by both webhook and legacy endpoint.
+    """
     # Get or create WhatsApp session
     wa_session = (
         db.query(WhatsAppSession)
-        .filter(WhatsAppSession.phone_number == request.phone_number)
+        .filter(WhatsAppSession.phone_number == phone_number)
         .first()
     )
 
     if not wa_session:
         wa_session = WhatsAppSession(
             id=str(uuid.uuid4()),
-            phone_number=request.phone_number,
+            phone_number=phone_number,
             session_id=str(uuid.uuid4()),
         )
         db.add(wa_session)
@@ -53,9 +114,9 @@ async def handle_whatsapp_message(
     # Generate response
     rag_service = RAGService()
     result = rag_service.generate_response(
-        query=request.message,
+        query=message,
         conversation_history=conversation_history,
-        phone_number=request.phone_number,
+        phone_number=phone_number,
     )
 
     # Save user message
@@ -63,7 +124,7 @@ async def handle_whatsapp_message(
         id=str(uuid.uuid4()),
         session_id=session_id,
         role="user",
-        content=request.message,
+        content=message,
     )
     db.add(user_msg)
 
@@ -77,12 +138,39 @@ async def handle_whatsapp_message(
     db.add(assistant_msg)
     db.commit()
 
+    # Send response via WASender (Running in background task)
+    background_tasks.add_task(
+        send_wasender_message_background,
+        phone_number=phone_number,
+        message=result["response"],
+        session_id=session_id
+    )
+
     return {
         "response": result["response"],
-        "phone_number": request.phone_number,
+        "phone_number": phone_number,
         "session_id": session_id,
         "category_image": result.get("category_image"),
+        "status": "processed"
     }
+
+
+@router.post("/message")
+async def handle_whatsapp_message(
+    request: WhatsAppMessage, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Legacy endpoint for internal testing or old node service.
+    Now forwards to the unified processing logic.
+    """
+    return await process_message_internal(
+        request.phone_number, 
+        request.message, 
+        db, 
+        background_tasks
+    )
 
 
 @router.get("/sessions")

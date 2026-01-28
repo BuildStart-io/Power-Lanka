@@ -17,6 +17,8 @@ services:
       - UPLOAD_DIR=/app/uploads
       - DATA_DIR=/app/data
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-5}
+      - WASENDER_API_URL=${WASENDER_API_URL:-https://www.wasenderapi.com/api/send-message}
+      - WHATSAPP_API_BEARER_TOKEN=${WHATSAPP_API_BEARER_TOKEN}
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
@@ -47,35 +49,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-  # WhatsApp Service - Node.js
-  whatsapp:
-    build:
-      context: ./whatsapp-service
-      dockerfile: Dockerfile
-    container_name: power-lanka-whatsapp
-    ports:
-      - "4000:4000"
-    environment:
-      - PORT=4000
-      - BACKEND_URL=http://backend:8000
-    volumes:
-      - whatsapp-auth:/app/.wwebjs_auth
-      - whatsapp-cache:/app/.wwebjs_cache
-    depends_on:
-      - backend
-    restart: unless-stopped
-    # Required for Puppeteer/Chromium
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp=unconfined
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-volumes:
-  whatsapp-auth:
-  whatsapp-cache:
