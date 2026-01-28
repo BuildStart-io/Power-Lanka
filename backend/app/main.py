@@ -13,12 +13,14 @@ from .routers import (
     whatsapp_router,
     admin_router,
     admin_products_router,
+    admin_chat_router,
 )
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,7 @@ app.include_router(chat_router)
 app.include_router(whatsapp_router)
 app.include_router(admin_router)
 app.include_router(admin_products_router)
+app.include_router(admin_chat_router)
 
 
 @app.get("/")

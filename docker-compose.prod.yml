@@ -1,14 +1,11 @@
 version: '3.8'
 
 services:
-  # Backend - FastAPI/Python
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: power-lanka-backend
-    ports:
-      - "8000:8000"
+    container_name: rag-backend-prod
+    restart: always
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - QDRANT_URL=${QDRANT_URL}
@@ -17,64 +14,68 @@ services:
       - UPLOAD_DIR=/app/uploads
       - DATA_DIR=/app/data
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-5}
+      - MODULE_NAME=app.main
+      - VARIABLE_NAME=app
+      - PORT=8000
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
       - ./media:/app/media:ro
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    container_name: rag-frontend-prod
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # Frontend - React/Nginx
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
-    container_name: power-lanka-dashboard
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
-  # WhatsApp Service - Node.js
   whatsapp:
     build:
       context: ./whatsapp-service
-      dockerfile: Dockerfile
-    container_name: power-lanka-whatsapp
-    ports:
-      - "4000:4000"
+    container_name: rag-whatsapp-prod
+    restart: always
     environment:
-      - PORT=4000
+      - PORT=3000
       - BACKEND_URL=http://backend:8000
     volumes:
       - whatsapp-auth:/app/.wwebjs_auth
       - whatsapp-cache:/app/.wwebjs_cache
     depends_on:
       - backend
-    restart: unless-stopped
-    # Required for Puppeteer/Chromium
     cap_add:
       - SYS_ADMIN
-    security_opt:
-      - seccomp=unconfined
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "5"
 
 volumes:
   whatsapp-auth:

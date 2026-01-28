@@ -14,17 +14,22 @@ ENV VITE_API_URL=${VITE_API_URL}
 
 RUN npm run build
 
-# Stage 2: Serve with simple static server
-FROM node:20-alpine
-
-WORKDIR /app
-
-# Install serve for static files
-RUN npm install -g serve
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
 
 # Copy built assets
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Add custom nginx config for SPA routing (try_files)
+RUN echo 'server { \
+    listen 80; \
+    location / { \
+    root /usr/share/nginx/html; \
+    index index.html index.htm; \
+    try_files $uri $uri/ /index.html; \
+    } \
+    }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-CMD ["serve", "-s", "dist", "-l", "80"]
+CMD ["nginx", "-g", "daemon off;"]

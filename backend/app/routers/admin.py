@@ -5,7 +5,8 @@ from typing import List, Optional
 from datetime import datetime
 import uuid
 
-from ..database import get_db, User, Product
+from ..database import get_db, User, Product, Order, OrderItem, WhatsAppSession
+from ..database.database import format_price
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -93,20 +94,29 @@ async def delete_user(user_id: str, db: Session = Depends(get_db)):
 @router.get("/stats")
 async def get_dashboard_stat(db: Session = Depends(get_db)):
     """Get dashboard statistics."""
-    # Count real data
-    total_customers = db.query(User).count() # Using admins as customers for now, or use WhatsAppSessions
-    # Actually, let's use WhatsApp sessions as "Customers"
-    # total_customers = db.query(WhatsAppSession).count() 
-    # But User model is imported. WhatsAppSession needs import if we use it.
+    from sqlalchemy import func
     
-    products_count = db.query(Product).count()
+    # Total Orders
+    total_orders = db.query(Order).count()
+    
+    # Pending Orders (Assuming 'pending' is the status for new orders)
+    pending_orders = db.query(Order).filter(Order.status == "pending").count()
+    
+    # Total Revenue
+    total_revenue = db.query(func.sum(Order.total_amount)).scalar() or 0
+    
+    # Total Customers (Unique WhatsApp Sessions)
+    total_customers = db.query(WhatsAppSession).count()
+    
+    # Total Items Sold
+    total_items_sold = db.query(func.sum(OrderItem.quantity)).scalar() or 0
     
     return {
-        "total_orders": 12, # Mock
-        "pending_orders": 2, # Mock
-        "total_revenue": 45000, # Mock
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "total_revenue": total_revenue,
         "total_customers": total_customers,
-        "total_items_sold": products_count * 5 # Mock
+        "total_items_sold": total_items_sold
     }
 
 @router.get("/product")
@@ -228,3 +238,78 @@ async def delete_product_image(
         return {"message": "Image deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+# --- Order Management Endpoints ---
+
+class OrderUpdate(BaseModel):
+    status: str
+
+@router.get("/orders")
+async def list_orders(status: Optional[str] = None, db: Session = Depends(get_db)):
+    """List all orders with optional status filter."""
+    query = db.query(Order).order_by(Order.created_at.desc())
+    
+    if status:
+        query = query.filter(Order.status == status)
+        
+    orders = query.all()
+    
+    # Format for frontend
+    return {
+        "orders": [
+            {
+                "id": o.id,
+                "phone": o.session_id, # Using session ID as phone for now, ideally join with WhatsAppSession
+                "customer_name": o.shipping_name or "Guest",
+                "total_amount": o.total_amount,
+                "item_count": len(o.items),
+                "status": o.status,
+                "created_at": o.created_at
+            }
+            for o in orders
+        ]
+    }
+
+@router.get("/orders/{order_id}")
+async def get_order_details(order_id: str, db: Session = Depends(get_db)):
+    """Get full details for a specific order."""
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    return {
+        "id": order.id,
+        "phone": order.session_id,
+        "customer_name": order.shipping_name,
+        "delivery_address": order.shipping_address,
+        "delivery_city": order.shipping_district,
+        "payment_method": order.payment_method,
+        "status": order.status,
+        "created_at": order.created_at,
+        "total_amount": order.total_amount,
+        "items": [
+            {
+                "id": item.id,
+                "category_name": item.product.product_name,
+                "phone_model": item.product.variant, 
+                "quantity": item.quantity,
+                "unit_price": item.unit_price
+            }
+            for item in order.items
+        ]
+    }
+
+@router.put("/orders/{order_id}/status")
+async def update_order_status(
+    order_id: str, 
+    status_update: OrderUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update order status."""
+    order = db.query(Order).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    order.status = status_update.status
+    db.commit()
+    
+    return {"message": "Status updated", "status": order.status}

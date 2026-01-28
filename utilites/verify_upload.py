@@ -1,25 +1,57 @@
-import requests
+#!/usr/bin/env python3
+"""
+Verify that specific specific details from data.txt are present in Qdrant.
+"""
 import sys
+import os
 
-API_URL = "http://localhost:8000"
-FILE_PATH = "data/power_products.xlsx"
+backend_path = os.path.join(os.path.dirname(__file__), "..", "backend")
+sys.path.insert(0, backend_path)
 
-def upload_file():
-    print(f"Uploading {FILE_PATH} to {API_URL}/documents/upload...")
-    try:
-        with open(FILE_PATH, "rb") as f:
-            files = {"file": f}
-            response = requests.post(f"{API_URL}/documents/upload", files=files)
-            
-        if response.status_code == 200:
-            print("✅ Upload Success!")
-            print(response.json())
+from app.services.vector_store import VectorStoreService
+
+def verify_upload():
+    print("=" * 50)
+    print("  Power Lanka - Knowledge Base Verification")
+    print("=" * 50)
+    
+    store = VectorStoreService()
+    
+    # List of specific unique phrases to check
+    test_phrases = [
+        "Captain Ceylon Pvt Ltd",
+        "ginger tea and manioc",
+        "cinnamon and turmeric",
+        "MS-DS Certificate issued by the ITI",
+        "damaging the fly's nervous system",
+        "Chelating Power",
+        "Surfactant Strength",
+        "rust rings in sinks",
+        "Power Odour Neutralizer Spray"
+    ]
+    
+    print(f"\n📡 Checking Qdrant Collection: {store.collection_name}\n")
+    
+    all_found = True
+    
+    for phrase in test_phrases:
+        # Search for this exact phrase
+        results = store.search(phrase, top_k=1, score_threshold=0.3)
+        
+        if results:
+            match = results[0]
+            # print(f"✅ FOUND: '{phrase}'")
+            # print(f"   Context: {match['description'][:60]}...")
+            print(f"✅ FOUND: '{phrase}'")
         else:
-            print(f"❌ Upload Failed: {response.status_code}")
-            print(response.text)
+            print(f"❌ MISSING: '{phrase}'")
+            all_found = False
             
-    except requests.exceptions.ConnectionError:
-        print(f"❌ Could not connect to {API_URL}. Is the backend running?")
+    print("-" * 50)
+    if all_found:
+        print("🎉 SUCCESS: All key details are present in the Vector DB!")
+    else:
+        print("⚠️ WARNING: Some details might be missing.")
 
 if __name__ == "__main__":
-    upload_file()
+    verify_upload()

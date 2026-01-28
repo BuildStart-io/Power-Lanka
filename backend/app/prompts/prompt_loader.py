@@ -65,6 +65,8 @@ def get_system_prompt_parts() -> dict:
         "product_accuracy": data.get("product_accuracy", "").strip(),
         "sales_techniques": data.get("sales_techniques", "").strip(),
         "common_scenarios": data.get("common_scenarios", "").strip(),
+        "ordering_protocol": data.get("ordering_protocol", "").strip(),
+        "business_policies": data.get("business_policies", "").strip(),
         "off_topic": get_off_topic_instruction(),
     }
 
@@ -141,6 +143,10 @@ def build_full_prompt(
 {parts['product_accuracy']}
 
 {parts['sales_techniques']}
+
+{parts['ordering_protocol']}
+
+{parts['business_policies']}
 
 {parts['common_scenarios']}
 

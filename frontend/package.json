@@ -1,6 +1,9 @@
 {
-    "name": "store-dashboard",
+    "name": "power-lanka-dashboard",
     "version": "1.0.0",
+    "description": "Admin Dashboard for Power Lanka WhatsApp Sales Agent",
+    "author": "Power Lanka",
+    "license": "MIT",
     "type": "module",
     "scripts": {
         "dev": "vite",

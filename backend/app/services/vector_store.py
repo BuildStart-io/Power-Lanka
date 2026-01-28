@@ -16,6 +16,7 @@ class VectorStoreService:
         self.client = QdrantClient(
             url=settings.qdrant_url,
             api_key=settings.qdrant_api_key,
+            timeout=60.0,
         )
         self.collection_name = settings.qdrant_collection_name
         self.embedding_service = EmbeddingService()
@@ -123,13 +124,14 @@ class VectorStoreService:
             )
 
         # Search with score threshold
-        results = self.client.search(
+        # Search with score threshold
+        results = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_embedding,
+            query=query_embedding,
             limit=top_k,
             query_filter=search_filter,
             score_threshold=score_threshold,
-        )
+        ).points
 
         # Format results (all results are now above threshold)
         formatted_results = []

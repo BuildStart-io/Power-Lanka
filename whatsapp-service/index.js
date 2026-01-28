@@ -10,13 +10,22 @@ const app = express();
 app.use(express.json());
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
+
+// Simple Logger
+const logger = {
+    info: (msg, ...args) => console.log(`[${new Date().toISOString()}] [INFO] ${msg}`, ...args),
+    warn: (msg, ...args) => console.warn(`[${new Date().toISOString()}] [WARN] ${msg}`, ...args),
+    error: (msg, ...args) => console.error(`[${new Date().toISOString()}] [ERROR] ${msg}`, ...args),
+    debug: (msg, ...args) => console.log(`[${new Date().toISOString()}] [DEBUG] ${msg}`, ...args)
+};
 
 // Initialize WhatsApp Client
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
+        executablePath: '/usr/bin/chromium',  // Use system Chromium
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -31,26 +40,26 @@ const client = new Client({
 
 // Generate QR Code
 client.on('qr', (qr) => {
-    console.log('QR RECEIVED', qr);
+    logger.info('QR RECEIVED', qr);
     qrcode.generate(qr, { small: true });
-    console.log('Please scan the QR code with your WhatsApp to authenticate.');
+    logger.info('Please scan the QR code with your WhatsApp to authenticate.');
 });
 
 // Client Ready
 client.on('ready', async () => {
-    console.log('WhatsApp Client is ready!');
+    logger.info('WhatsApp Client is ready!');
     // Set presence to online
     try {
         await client.sendPresenceAvailable();
-        console.log('Presence set to online');
+        logger.info('Presence set to online');
     } catch (e) {
-        console.error('Failed to set presence:', e.message);
+        logger.error('Failed to set presence:', e.message);
     }
 });
 
 // Authentication Failure
 client.on('auth_failure', msg => {
-    console.error('AUTHENTICATION FAILURE', msg);
+    logger.error('AUTHENTICATION FAILURE', msg);
 });
 
 // Track processed messages to avoid duplicates
@@ -58,10 +67,10 @@ const processedMessages = new Set();
 
 // Extract phone number helper
 function extractPhoneNumber(waId) {
-  return waId
-    .replace("@c.us", "")
-    .replace("@s.whatsapp.net", "")
-    .replace("@lid", "");
+    return waId
+        .replace("@c.us", "")
+        .replace("@s.whatsapp.net", "")
+        .replace("@newsletter", "");
 }
 
 // Handle incoming messages
@@ -86,7 +95,7 @@ async function handleMessage(msg) {
         // Ignore messages from status@broadcast (double check)
         if (msg.from === 'status@broadcast') return;
 
-        console.log(`Received message from ${msg.from}: ${msg.body}`);
+        logger.info(`Received message from ${msg.from}: ${msg.body}`);
 
         // Mark as processed
         processedMessages.add(messageId);
@@ -99,76 +108,86 @@ async function handleMessage(msg) {
         // Extract phone number
         const phoneNumber = extractPhoneNumber(msg.from);
 
-        console.log(`[DEBUG] Processing message from ${phoneNumber}`);
+        logger.debug(`Processing message from ${phoneNumber}`);
 
         // Get chat and show typing indicator
         const chat = await msg.getChat();
+
+        // Try to send blue ticks (may fail due to WhatsApp API changes)
+        try {
+            await chat.sendSeen();
+            logger.debug('Blue ticks sent');
+        } catch (seenError) {
+            logger.warn('sendSeen failed (non-critical):', seenError.message);
+        }
+
         await chat.sendStateTyping();
-        console.log('[DEBUG] Typing indicator shown');
+        logger.debug('Typing indicator shown');
 
         const response = await axios.post(`${BACKEND_URL}/whatsapp/message`, {
             phone_number: phoneNumber,
             message: msg.body
         });
 
-        console.log('[DEBUG] Backend response received');
+        logger.debug('Backend response received');
 
         if (response.data && response.data.response) {
             // Clear typing indicator
             try {
-                console.log('[DEBUG] Clearing typing state');
+                logger.debug('Clearing typing state');
                 await chat.clearState();
 
                 // Check if there's a category image to send
                 if (response.data.category_image) {
                     const imagePath = path.join(
-                        '/home/lord/Projects/Rag_Agent',
+                        __dirname,
+                        '../backend/media',
                         response.data.category_image
                     );
 
-                    console.log('[DEBUG] Category image path:', imagePath);
+                    logger.debug('Category image path:', imagePath);
 
                     if (fs.existsSync(imagePath)) {
                         try {
-                            console.log('[DEBUG] Sending image with caption');
+                            logger.debug('Sending image with caption');
                             const media = MessageMedia.fromFilePath(imagePath);
                             await chat.sendMessage(media, {
                                 caption: response.data.response,
                                 sendSeen: false
                             });
-                            console.log(`[DEBUG] Sent image with reply to ${msg.from}`);
+                            logger.info(`Sent image with reply to ${msg.from}`);
                         } catch (imgError) {
-                            console.error('[DEBUG] Failed to send image:', imgError.message);
+                            logger.error('Failed to send image:', imgError.message);
                             // Fallback: send text only
                             await chat.sendMessage(response.data.response, { sendSeen: false });
                         }
                     } else {
-                        console.log('[DEBUG] Image file not found, sending text only');
+                        logger.warn('Image file not found, sending text only');
                         await chat.sendMessage(response.data.response, { sendSeen: false });
                     }
                 } else {
-                    console.log('[DEBUG] No category image, sending text only');
+                    logger.debug('No category image, sending text only');
                     await chat.sendMessage(response.data.response, { sendSeen: false });
                 }
-                console.log(`[DEBUG] Sent reply to ${msg.from}`);
+                logger.info(`Sent reply to ${msg.from}`);
             } catch (sendError) {
-                console.error('[DEBUG] chat.sendMessage failed:', sendError.message);
+                logger.error('chat.sendMessage failed:', sendError.message);
             }
         } else {
-            console.error('Invalid response from backend:', response.data);
+            logger.error('Invalid response from backend:', response.data);
             try {
                 await chat.clearState();
                 await chat.sendMessage("Sorry, I'm having trouble processing your request right now.", { sendSeen: false });
             } catch (e) {
-                console.error('Failed to send error message:', e.message);
+                logger.error('Failed to send error message:', e.message);
             }
         }
 
     } catch (error) {
-        console.error('Error processing message:', error.message);
-        console.error('Stack trace:', error.stack);
+        logger.error('Error processing message:', error.message);
+        logger.error('Stack trace:', error.stack);
         if (error.response) {
-            console.error('Backend error data:', error.response.data);
+            logger.error('Backend error data:', error.response.data);
         }
 
         // Send user-friendly error message
@@ -180,15 +199,19 @@ async function handleMessage(msg) {
                 { sendSeen: false }
             );
         } catch (sendError) {
-            console.error('Failed to send error message to user:', sendError.message);
+            logger.error('Failed to send error message to user:', sendError.message);
         }
     }
 }
 
-// Listen to message_create instead of message for better reliability
-client.on('message_create', async (msg) => {
+// Listen to 'message' event (only incoming messages from others)
+client.on('message', async (msg) => {
+    // Extra safety: Ignore Newsletters
+    if (msg.from.includes('@newsletter')) return;
+
     await handleMessage(msg);
 });
+// client.on('message_create') captures own messages too - disabling it to fix duplicates.
 
 // Start Client
 client.initialize();
@@ -199,5 +222,5 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`WhatsApp Service listening on port ${PORT}`);
+    logger.info(`WhatsApp Service listening on port ${PORT}`);
 });

@@ -12,6 +12,9 @@
           <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' }" @click="closeMobileMenuOnClick">
             Dashboard
           </router-link>
+          <router-link to="/orders" class="nav-link" :class="{ active: $route.path === '/orders' }" @click="closeMobileMenuOnClick">
+            Orders
+          </router-link>
           <router-link to="/products" class="nav-link" :class="{ active: $route.path === '/products' }" @click="closeMobileMenuOnClick">
             Products
           </router-link>

@@ -10,7 +10,9 @@ import ProductsView from './views/ProductsView.vue'
 import CustomersView from './views/CustomersView.vue'
 import UsersView from './views/UsersView.vue'
 import ChatHistoryView from './views/ChatHistoryView.vue'
+
 import WhatsAppView from './views/WhatsAppView.vue'
+import OrdersView from './views/OrdersView.vue'
 
 // Router configuration
 const routes = [
@@ -18,6 +20,7 @@ const routes = [
     { path: '/', name: 'Dashboard', component: DashboardView, meta: { requiresAuth: true } },
     { path: '/products', name: 'Products', component: ProductsView, meta: { requiresAuth: true } },
     { path: '/admins', name: 'Admins', component: UsersView, meta: { requiresAuth: true } },
+    { path: '/orders', name: 'Orders', component: OrdersView, meta: { requiresAuth: true } },
     { path: '/whatsapp', name: 'WhatsApp', component: WhatsAppView, meta: { requiresAuth: true } },
     { path: '/customers', name: 'Customers', component: CustomersView, meta: { requiresAuth: true } },
     { path: '/chat/:phone', name: 'ChatHistory', component: ChatHistoryView, meta: { requiresAuth: true } },

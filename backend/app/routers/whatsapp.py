@@ -55,6 +55,7 @@ async def handle_whatsapp_message(
     result = rag_service.generate_response(
         query=request.message,
         conversation_history=conversation_history,
+        phone_number=request.phone_number,
     )
 
     # Save user message

@@ -1,34 +1,25 @@
 <template>
-  <div class="animated-page">
-    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
-      <router-link to="/customers" class="btn btn-secondary btn-sm">← Back</router-link>
-      <h1>💬 Chat History: {{ phone }}</h1>
+  <div class="chat-history-view animated-page">
+    <div class="page-header">
+       <router-link to="/customers" class="back-link">← Back to Customers</router-link>
+       <h1>💬 {{ phone }}</h1>
     </div>
-    
-    <div v-if="customer" class="card" style="margin-bottom: 1.5rem;">
-      <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-        <div><strong>Name:</strong> {{ customer.name || 'N/A' }}</div>
-        <div><strong>Phone:</strong> {{ customer.phone }}</div>
-        <div><strong>Address:</strong> {{ customer.address || 'N/A' }}</div>
-        <div><strong>District:</strong> {{ customer.city || 'N/A' }}</div>
-      </div>
-    </div>
-    
-    <div v-if="loading" class="loading">Loading...</div>
-    
-    <div v-else class="card">
+
+    <div v-if="loading" class="loading">Loading chat...</div>
+
+    <div v-else class="chat-card">
       <div class="chat-container">
         <div 
           v-for="(msg, index) in messages" 
           :key="index"
-          :class="['chat-message', msg.role]"
+          :class="['chat-bubble', msg.role]"
         >
           <div class="chat-content">{{ msg.content }}</div>
-          <div class="chat-time">{{ formatTime(msg.time) }}</div>
+          <div class="chat-meta">{{ formatTime(msg.time) }}</div>
         </div>
         
-        <div v-if="messages.length === 0" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
-          No messages yet
+        <div v-if="messages.length === 0" class="empty-chat">
+          No conversation history found.
         </div>
       </div>
     </div>
@@ -44,7 +35,6 @@ export default {
     return {
       loading: true,
       phone: '',
-      customer: null,
       messages: []
     }
   },
@@ -54,19 +44,13 @@ export default {
   },
   methods: {
     async fetchChatHistory() {
-      const token = localStorage.getItem('admin_token')
-      
       try {
-        const response = await fetch(`${API_BASE}/admin/chat-history/${this.phone}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          this.customer = data.customer
+        const res = await fetch(`${API_BASE}/admin/chat-history/${this.phone}`)
+        if (res.ok) {
+          const data = await res.json()
           this.messages = data.messages
-        } else if (response.status === 401) {
-          this.$router.push('/login')
+        } else {
+           console.error("Failed to load history")
         }
       } catch (err) {
         console.error('Error fetching chat history:', err)
@@ -76,8 +60,7 @@ export default {
     },
     formatTime(timeStr) {
       if (!timeStr) return ''
-      const date = new Date(timeStr)
-      return date.toLocaleString()
+      return new Date(timeStr).toLocaleString()
     }
   }
 }
@@ -86,117 +69,68 @@ export default {
 <style scoped>
 .page-header {
   margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.back-link {
+    text-decoration: none;
+    font-weight: bold;
+    color: hsl(var(--primary)); 
+    background: hsl(var(--primary)/0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
 }
 
-.page-header h1 {
-  color: hsl(var(--foreground));
-  background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.card {
+.chat-card {
   background: hsl(var(--card));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  box-shadow: 0 20px 25px -5px hsl(var(--primary) / 0.05), 0 10px 10px -5px hsl(var(--primary) / 0.02);
+  border: 1px solid hsl(var(--border) / 0.4);
+  border-radius: 1.5rem;
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-container {
-  max-height: 60vh;
+  flex: 1;
   overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.chat-bubble {
+  max-width: 70%;
   padding: 1rem;
+  border-radius: 1rem;
+  position: relative;
 }
 
-.chat-message {
-  max-width: 80%;
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.chat-message.user {
+.chat-bubble.user {
+  align-self: flex-end;
   background: hsl(var(--primary) / 0.2);
-  border: 1px solid hsl(var(--primary) / 0.3);
-  margin-left: auto;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 0.25rem;
   color: hsl(var(--foreground));
 }
 
-.chat-message.assistant {
-  background: hsl(var(--muted) / 0.5);
-  border: 1px solid hsl(var(--border));
-  margin-right: auto;
-  border-bottom-left-radius: 4px;
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: hsl(var(--muted));
+  border-bottom-left-radius: 0.25rem;
   color: hsl(var(--foreground));
 }
 
-.chat-content {
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: hsl(var(--foreground));
-}
-
-.chat-time {
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
+.chat-meta {
+  font-size: 0.7rem;
   margin-top: 0.5rem;
+  opacity: 0.7;
+  text-align: right;
 }
 
-@media (max-width: 768px) {
-  .page-header h1 {
-    font-size: 1.25rem;
-  }
-
-  .chat-container {
-    max-height: calc(100vh - 280px);
-    padding: 0.5rem;
-  }
-
-  .chat-message {
-    max-width: 92%;
-    padding: 0.875rem;
-    font-size: 0.8125rem;
-  }
-
-  .card {
-    padding: 1rem;
-    border-radius: 1rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .page-header h1 {
-    font-size: 1.25rem;
-  }
-
-  .chat-message {
-    max-width: 90%;
-    padding: 0.625rem;
-    font-size: 0.875rem;
-  }
-
-  .card {
-    padding: 0.75rem;
-  }
-}
-
-.animated-page {
-  animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.empty-chat {
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+    margin-top: 2rem;
 }
 </style>

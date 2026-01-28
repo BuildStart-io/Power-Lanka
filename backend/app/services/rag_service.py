@@ -13,8 +13,11 @@ from ..prompts import (
     get_query_expand_prompt,
     get_query_expand_fallback,
     get_query_rewrite_prompt,
+    get_query_rewrite_prompt,
     build_full_prompt,
 )
+from ..agent.tools import add_to_cart, view_cart, save_shipping_details, confirm_order
+import ast
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +177,7 @@ class RAGService:
         self,
         query: str,
         conversation_history: Optional[list[dict]] = None,
+        phone_number: str = None,
     ) -> dict:
         """Generate response using RAG pipeline with human-like sales agent behavior."""
         logger.info(f"RAG query: {query}")
@@ -242,6 +246,7 @@ class RAGService:
         try:
             response = self._generate_with_fallback(prompt)
             response_text = response.text
+            logger.info(f"Raw LLM Response: {response_text}")
 
             # Step 9: Validate script purity (detect Chinese, Telugu, etc.)
             is_valid, contaminated_script = self._validate_script_purity(response_text)
@@ -249,7 +254,13 @@ class RAGService:
                 logger.warning(f"Script contamination detected: {contaminated_script} characters in response")
                 # Strip foreign scripts as cleanup
                 response_text = self._strip_foreign_scripts(response_text)
+                response_text = self._strip_foreign_scripts(response_text)
                 logger.info("Foreign script characters stripped from response")
+
+            # Step 10: Process Tool Calls (Regex based)
+            if phone_number:
+                response_text = self._execute_tool_calls(response_text, phone_number)
+                
         except (ResourceExhausted, Exception) as e:
             logger.error(f"API exhausted or failed during response generation: {str(e)}")
             response_text = (
@@ -279,7 +290,7 @@ class RAGService:
         try:
             for i, result in enumerate(results, 1):
                 p_name = result.get('product_name', "").strip()
-                p_variant = result.get('variant', "").strip()
+                p_variant = (result.get('variant') or "").strip()
                 
                 # Default "static" values (fallback)
                 price = result.get('price_lkr', 0)
@@ -330,6 +341,91 @@ class RAGService:
             history_parts.append(f"{role.capitalize()}: {content}")
 
         return "\n".join(history_parts)
+
+    def _execute_tool_calls(self, text: str, phone: str) -> str:
+        """Detect and execute tool calls in the response text."""
+        # Pattern to match: function_name(arg1, arg2...)
+        # We look for specific known tool names
+        tools = {
+            "add_to_cart": add_to_cart,
+            "view_cart": view_cart,
+            "save_shipping_details": save_shipping_details,
+            "confirm_order": confirm_order
+        }
+        
+        # This regex is a bit naive but works for standard calls. 
+        # It captures the function name and the arguments string inside parentheses.
+        # Updated regex to be more robust:
+        # 1. Matches optional code block markers (```python etc)
+        # 2. Matches tool name
+        # 3. Matches parentheses and content across newlines
+        pattern = r"(add_to_cart|view_cart|save_shipping_details|confirm_order)\s*\(([\s\S]*?)\)"
+        
+        matches = list(re.finditer(pattern, text))
+        
+        logger.info(f"Scanning response for tools. Text length: {len(text)}. Matches found: {len(matches)}")
+        if not matches and "confirm_order" in text:
+             logger.warning(f"Potential missed tool call in text: {text[:100]}...")
+        
+        # Execute distinct calls (avoid duplicates if repeated?)
+        executed_results = []
+        
+        for match in matches:
+            func_name = match.group(1)
+            args_str = match.group(2)
+            
+            try:
+                # Prepare arguments
+                # We need to prepend 'phone' if it's not explicitly in the call, 
+                # OR we inspect the args.
+                # The Prompt says `add_to_cart(phone, ...)` so LLM might include it or not.
+                # Let's try to parse args_str as a tuple
+                
+                # Wrap in tuple to parse: (args_str)
+                # If args_str is empty, plain eval might fail, but tools take args.
+                
+                # Safe eval using ast.literal_eval is hard because users might put strings without quotes?
+                # LLM is instructed to write code.
+                
+                # Trick: use eval() but with restricted globals/locals
+                # We can inject 'phone' variable into the context
+                
+                local_scope = {"phone": phone}
+                
+                # If the string is distinct arguments `phone, "Items", 1`, wrapping in `func(...)` and evaling works.
+                # We construct the full call string
+                call_str = f"{func_name}({args_str})"
+                
+                # For safety, we only allow literal values + the 'phone' variable. 
+                # But `add_to_cart` string might be complex.
+                # Let's rely on our specific tools map.
+                
+                # Define a context where tools are available and 'phone' is a variable
+                context = tools.copy()
+                context['phone'] = phone
+                
+                # Execute
+                result = eval(call_str, {"__builtins__": {}}, context)
+                
+                executed_results.append(f"\n\n⚙️ *System Action*: {result}")
+                
+            except Exception as e:
+                logger.error(f"Tool execution failed for {func_name}: {e}")
+                executed_results.append(f"\n\n❌ Action Failed: {str(e)}")
+        
+        # If we executed tools, append results to response
+        # Also, maybe strip the tool call string from the user-facing response?
+        # The user might find `add_to_cart(...)` confusing if left in text.
+        
+        final_text = text
+        for match in matches:
+            # Remove the call string from the final text to make it clean
+            final_text = final_text.replace(match.group(0), "").strip()
+            
+        if executed_results:
+            final_text += "".join(executed_results)
+            
+        return final_text
 
     def get_simple_response(self, query: str) -> str:
         """Get a simple response without sources (for WhatsApp)."""
