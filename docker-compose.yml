@@ -60,8 +60,8 @@ services:
       - PORT=4000
       - BACKEND_URL=http://backend:8000
     volumes:
-      - whatsapp-auth:/app/.wwebjs_auth
-      - whatsapp-cache:/app/.wwebjs_cache
+      - ./whatsapp-auth:/app/.wwebjs_auth
+      - ./whatsapp-cache:/app/.wwebjs_cache
     depends_on:
       - backend
     restart: unless-stopped
@@ -75,7 +75,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  whatsapp-auth:
-  whatsapp-cache:
