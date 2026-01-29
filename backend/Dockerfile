@@ -22,6 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ ./app/
 COPY cli_chat.py .
+COPY seed_data.py .
+COPY check_db_content.py .
 
 # Create directories for data and uploads
 RUN mkdir -p /app/data /app/uploads /app/media

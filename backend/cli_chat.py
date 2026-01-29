@@ -16,6 +16,11 @@ if os.path.exists(env_path):
 else:
     load_dotenv()
 
+# Configure Logging to see internal tool logs
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 from app.services.rag_service import RAGService
 
 from contextlib import asynccontextmanager
@@ -30,6 +35,13 @@ async def lifespan(app: FastAPI):
     global rag_service
     print("Initializing RAG Service...")
     try:
+        # Auto-seed if needed
+        from seed_data import seed_products
+        try:
+            seed_products()
+        except Exception as seed_err:
+            print(f"Seeding ignored or failed: {seed_err}")
+
         rag_service = RAGService()
         print("RAG Service Initialized!")
     except Exception as e:
