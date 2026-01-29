@@ -3,6 +3,7 @@ import sys
 import uvicorn
 import requests
 from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -22,6 +23,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from app.services.rag_service import RAGService
+from app.routers import (
+    admin_router,
+    admin_products_router,
+    admin_chat_router
+)
 
 from contextlib import asynccontextmanager
 from fastapi.responses import RedirectResponse
@@ -55,6 +61,20 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(title="CLI Chat Server", lifespan=lifespan)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include Admin Routers
+app.include_router(admin_router)
+app.include_router(admin_products_router)
+app.include_router(admin_chat_router)
 
 @app.get("/")
 async def root():
