@@ -34,11 +34,26 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('admin_token')
+    const userStr = localStorage.getItem('admin_user')
+    const role = userStr ? (JSON.parse(userStr).role || 'admin') : 'admin'
+
     if (to.meta.requiresAuth && !token) {
         next('/login')
     } else if (to.path === '/login' && token) {
-        next('/')
+        if (role === 'staff') {
+            next('/orders')
+        } else {
+            next('/')
+        }
     } else {
+        // Role based access control
+        if (token && role === 'staff') {
+            const restrictedPaths = ['/', '/products', '/admins', '/dashboard', '/whatsapp', '/customers']
+            if (restrictedPaths.includes(to.path)) {
+                next('/orders')
+                return
+            }
+        }
         next()
     }
 })

@@ -78,12 +78,17 @@ export default {
           })
         })
         
-        if (response.ok) {
-          const data = await response.json()
-          localStorage.setItem('admin_token', data.token)
-          localStorage.setItem('admin_user', JSON.stringify(data.user))
-          this.$router.push('/')
-        } else {
+          if (response.ok) {
+            const data = await response.json()
+            localStorage.setItem('admin_token', data.token)
+            localStorage.setItem('admin_user', JSON.stringify(data.user))
+            
+            if (data.user.role === 'staff') {
+              this.$router.push('/orders')
+            } else {
+              this.$router.push('/')
+            }
+          } else {
           const err = await response.json()
           this.error = err.detail || 'Login failed'
         }

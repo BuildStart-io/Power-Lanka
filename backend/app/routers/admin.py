@@ -22,6 +22,7 @@ class UserCreate(BaseModel):
     email: str
     password: str
     full_name: str
+    role: Optional[str] = "staff"
 
 class UserResponse(BaseModel):
     id: str
@@ -50,7 +51,8 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         "token": f"mock_token_{uuid.uuid4()}",
         "user": {
             "email": user.email,
-            "full_name": user.full_name
+            "name": user.full_name,
+            "role": user.role or "admin"
         }
     }
 
@@ -70,7 +72,8 @@ async def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         id=str(uuid.uuid4()),
         email=user_data.email,
         password_hash=user_data.password, # For production, hash this
-        full_name=user_data.full_name
+        full_name=user_data.full_name,
+        role=user_data.role
     )
     db.add(new_user)
     db.commit()
@@ -246,39 +249,44 @@ class OrderUpdate(BaseModel):
 @router.get("/orders")
 async def list_orders(status: Optional[str] = None, db: Session = Depends(get_db)):
     """List all orders with optional status filter."""
-    query = db.query(Order).order_by(Order.created_at.desc())
+    query = db.query(Order, WhatsAppSession).join(WhatsAppSession, Order.session_id == WhatsAppSession.id).order_by(Order.created_at.desc())
     
     if status:
         query = query.filter(Order.status == status)
         
-    orders = query.all()
+    results = query.all()
     
     # Format for frontend
     return {
         "orders": [
             {
                 "id": o.id,
-                "phone": o.session_id, # Using session ID as phone for now, ideally join with WhatsAppSession
+                # Use phone number from the joined session table
+                "phone": s.phone_number, 
                 "customer_name": o.shipping_name or "Guest",
                 "total_amount": o.total_amount,
                 "item_count": len(o.items),
                 "status": o.status,
                 "created_at": o.created_at
             }
-            for o in orders
+            for o, s in results
         ]
     }
 
 @router.get("/orders/{order_id}")
 async def get_order_details(order_id: str, db: Session = Depends(get_db)):
     """Get full details for a specific order."""
-    order = db.query(Order).get(order_id)
-    if not order:
+    # Join with WhatsAppSession to get phone number
+    result = db.query(Order, WhatsAppSession).join(WhatsAppSession, Order.session_id == WhatsAppSession.id).filter(Order.id == order_id).first()
+    
+    if not result:
         raise HTTPException(status_code=404, detail="Order not found")
+        
+    order, session = result
         
     return {
         "id": order.id,
-        "phone": order.session_id,
+        "phone": session.phone_number, # Return actual phone number
         "customer_name": order.shipping_name,
         "delivery_address": order.shipping_address,
         "delivery_city": order.shipping_district,

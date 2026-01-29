@@ -125,6 +125,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     full_name = Column(String, nullable=True)
     is_active = Column(Integer, default=1)
+    role = Column(String, default="admin") # admin, staff
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

@@ -9,22 +9,22 @@
           <button class="mobile-menu-close" @click="toggleMobileMenu">✕</button>
         </div>
         <nav>
-          <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' }" @click="closeMobileMenuOnClick">
+          <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
             Dashboard
           </router-link>
           <router-link to="/orders" class="nav-link" :class="{ active: $route.path === '/orders' }" @click="closeMobileMenuOnClick">
             Orders
           </router-link>
-          <router-link to="/products" class="nav-link" :class="{ active: $route.path === '/products' }" @click="closeMobileMenuOnClick">
+          <router-link to="/products" class="nav-link" :class="{ active: $route.path === '/products' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
             Products
           </router-link>
-          <router-link to="/whatsapp" class="nav-link" :class="{ active: $route.path === '/whatsapp' }" @click="closeMobileMenuOnClick">
+          <router-link to="/whatsapp" class="nav-link" :class="{ active: $route.path === '/whatsapp' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
             WhatsApp
           </router-link>
-          <router-link to="/customers" class="nav-link" :class="{ active: $route.path === '/customers' }" @click="closeMobileMenuOnClick">
+          <router-link to="/customers" class="nav-link" :class="{ active: $route.path === '/customers' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
             Customers
           </router-link>
-          <router-link to="/admins" class="nav-link" :class="{ active: $route.path === '/admins' }" @click="closeMobileMenuOnClick">
+          <router-link to="/admins" class="nav-link" :class="{ active: $route.path === '/admins' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
             Admins
           </router-link>
         </nav>
@@ -88,6 +88,10 @@ export default {
     adminName() {
       const user = localStorage.getItem('admin_user')
       return user ? JSON.parse(user).name : 'Admin'
+    },
+    userRole() {
+       const user = localStorage.getItem('admin_user')
+       return user ? (JSON.parse(user).role || 'admin') : 'admin'
     }
   },
   watch: {

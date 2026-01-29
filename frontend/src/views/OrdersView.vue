@@ -86,12 +86,12 @@
         </div>
 
         <div v-if="expandedOrder === order.id" class="order-details">
-          <div class="detail-section">
+          <div class="detail-section" v-if="orderDetails[order.id]">
             <h4>Delivery Details</h4>
-            <p v-if="order.delivery_address"><strong>Address:</strong> {{ order.delivery_address }}</p>
-            <p v-if="order.delivery_city"><strong>City:</strong> {{ order.delivery_city }}</p>
-            <p v-if="order.payment_method"><strong>Payment:</strong> {{ order.payment_method === 'cod' ? 'Cash on Delivery' : 'Bank Transfer' }}</p>
-            <p v-if="order.special_note"><strong>Note:</strong> {{ order.special_note }}</p>
+            <p v-if="orderDetails[order.id].delivery_address"><strong>Address:</strong> {{ orderDetails[order.id].delivery_address }}</p>
+            <p v-if="orderDetails[order.id].delivery_city"><strong>City:</strong> {{ orderDetails[order.id].delivery_city }}</p>
+            <p v-if="orderDetails[order.id].payment_method"><strong>Payment:</strong> {{ orderDetails[order.id].payment_method === 'cod' ? 'Cash on Delivery' : 'Bank Transfer' }}</p>
+            <p v-if="orderDetails[order.id].special_note"><strong>Note:</strong> {{ orderDetails[order.id].special_note }}</p>
           </div>
 
           <div class="detail-section" v-if="orderDetails[order.id]">
