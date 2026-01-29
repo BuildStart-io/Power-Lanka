@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     # Gemini
-    gemini_api_key: str
+    gemini_api_key: str | None = None
     gemini_model: str = "gemini-flash-lite-latest"
     gemini_embedding_model: str = "text-embedding-004"
 

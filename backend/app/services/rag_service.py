@@ -1,9 +1,10 @@
-import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted
+# import google.generativeai as genai
+# from google.api_core.exceptions import ResourceExhausted
 from typing import Optional
 import logging
 import re
 from collections import Counter
+from openai import OpenAI
 
 from ..config import get_settings
 from .vector_store import VectorStoreService
@@ -28,15 +29,18 @@ class RAGService:
     def __init__(self):
         self.settings = get_settings()
         
-        # Configure Gemini
-        if not self.settings.gemini_api_key:
-            logger.warning("GEMINI_API_KEY not set")
+        # Configure OpenRouter (via OpenAI Client)
+        if not self.settings.openrouter_api_key:
+            logger.warning("OPENROUTER_API_KEY not set")
+            self.client = None
         else:
-            genai.configure(api_key=self.settings.gemini_api_key)
+            self.client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.settings.openrouter_api_key,
+            )
             
-        # Use Gemini Model
-        self.model_name = self.settings.gemini_model
-        self.model = genai.GenerativeModel(self.model_name)
+        # Use OpenRouter Model
+        self.model_name = self.settings.openrouter_model or "google/gemini-2.0-flash-001"
         
         self.vector_store = VectorStoreService()
         self.top_k = self.settings.top_k_results
@@ -60,20 +64,29 @@ class RAGService:
         }
 
     def _generate_with_fallback(self, prompt: str):
-        """Generate content using Gemini."""
+        """Generate content using OpenRouter."""
         try:
-            # Gemini generation
-            response = self.model.generate_content(prompt)
+            if not self.client:
+                raise ValueError("OpenRouter client not initialized (missing API key)")
+
+            # OpenRouter generation
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                # temperature=0.7, # Optional
+            )
             
+            content = response.choices[0].message.content
+
             # Wrap response to match interface expected by caller
             class ResponseWrapper:
                 def __init__(self, content):
                     self.text = content
             
-            return ResponseWrapper(response.text)
+            return ResponseWrapper(content)
 
         except Exception as e:
-            logger.error(f"Gemini generation failed: {str(e)}")
+            logger.error(f"Generation failed: {str(e)}")
             # Raise or return fallback? Raising allows retry/handling upstream
             raise e
 
@@ -260,7 +273,7 @@ class RAGService:
             if phone_number:
                 response_text = self._execute_tool_calls(response_text, phone_number)
                 
-        except (ResourceExhausted, Exception) as e:
+        except Exception as e:
             logger.error(f"API exhausted or failed during response generation: {str(e)}")
             response_text = (
                 "⚠️ *System Busy*\n\n"

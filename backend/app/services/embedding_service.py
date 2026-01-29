@@ -1,31 +1,44 @@
 import logging
 import time
 from typing import List
+# import google.generativeai as genai
 from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
 class EmbeddingService:
-    """Service for generating embeddings using OpenRouter (OpenAI Compatible)."""
+    """Service for generating embeddings using OpenRouter or Gemini."""
 
     def __init__(self):
         self.settings = get_settings()
-        from openai import OpenAI
+        self.provider = "openrouter"
         
-        # Use OpenRouter for embeddings too
-        self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=self.settings.openrouter_api_key,
-        )
-        self.model_name = "text-embedding-3-small"
+        # Determine provider based on available keys
+        if self.settings.openrouter_api_key:
+            self.provider = "openrouter"
+            from openai import OpenAI
+            self.client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.settings.openrouter_api_key,
+            )
+            self.model_name = "text-embedding-3-small"
+            self.dimension = 1536
+        else:
+            logger.warning("No API key found for embeddings (OpenRouter).")
+            self.provider = "none"
+            self.dimension = 1536
 
     def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text using OpenAI."""
+        """Generate embedding for a single text."""
+        if self.provider == "openrouter":
+            return self._generate_openai_embedding(text)
+        return [0.0] * self.dimension
+
+    def _generate_openai_embedding(self, text: str) -> List[float]:
         try:
             # Simple retry logic
             for _ in range(3):
                 try:
-                    # Clean text slightly (remove newlines usually helps)
                     clean_text = text.replace("\n", " ")
                     response = self.client.embeddings.create(
                         input=clean_text,
@@ -33,20 +46,17 @@ class EmbeddingService:
                     )
                     return response.data[0].embedding
                 except Exception as e:
-                    logger.warning(f"Embedding failed, retrying: {e}")
+                    logger.warning(f"OpenRouter embedding failed, retrying: {e}")
                     time.sleep(1)
             
-            # Final attempt
             response = self.client.embeddings.create(
                 input=text.replace("\n", " "),
                 model=self.model_name
             )
             return response.data[0].embedding
-            
         except Exception as e:
-            logger.error(f"Failed to generate embedding: {str(e)}")
-            # Return zero vector of correct dimension (1536)
-            return [0.0] * 1536
+            logger.error(f"Failed to generate OpenRouter embedding: {str(e)}")
+            return [0.0] * self.dimension
 
     def generate_query_embedding(self, query: str) -> List[float]:
         """Generate embedding for search query."""
@@ -55,23 +65,20 @@ class EmbeddingService:
     def generate_embeddings_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts."""
         embeddings = []
-        batch_size = 50  # Conservative batching
+        batch_size = 50
         
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             try:
-                # OpenAI supports batting
                 clean_batch = [t.replace("\n", " ") for t in batch]
                 response = self.client.embeddings.create(
                     input=clean_batch,
                     model=self.model_name
                 )
-                # Sort by index to be safe, though usually preserves order
                 data = sorted(response.data, key=lambda x: x.index)
                 embeddings.extend([d.embedding for d in data])
             except Exception as e:
                 logger.error(f"Batch embedding failed: {e}")
-                # Fallback to individual
                 for text in batch:
                     embeddings.append(self.generate_embedding(text))
                     
@@ -79,4 +86,4 @@ class EmbeddingService:
 
     def get_embedding_dimension(self) -> int:
         """Return the dimension of embeddings."""
-        return 1536
+        return self.dimension
