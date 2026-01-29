@@ -1,4 +1,12 @@
 
+import sys
+import os
+
+# Add backend to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(os.path.join(project_root, 'backend'))
+
 from app.database import SessionLocal, Product, engine, Base
 import uuid
 

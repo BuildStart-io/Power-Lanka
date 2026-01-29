@@ -8,10 +8,13 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # Ensure the backend directory is in the path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Ensure the backend directory is in the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(os.path.join(project_root, 'backend'))
 
 # Load environment variables
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backend/.env")
 if os.path.exists(env_path):
     load_dotenv(env_path)
 else:
@@ -31,7 +34,7 @@ from app.routers import (
 
 from contextlib import asynccontextmanager
 from fastapi.responses import RedirectResponse
-from app.database import SessionLocal, WhatsAppSession, ConversationMessage
+from app.database import SessionLocal, WhatsAppSession, ConversationMessage, get_sl_time
 import uuid
 from datetime import datetime
 
@@ -137,7 +140,7 @@ async def chat_endpoint(payload: WebhookPayload):
             print(f"[DB] Found EXISTING session: {wa_session.session_id}")
         
         # Update last message time
-        wa_session.last_message_at = datetime.utcnow()
+        wa_session.last_message_at = get_sl_time()
         db.commit()
 
         # Get conversation history

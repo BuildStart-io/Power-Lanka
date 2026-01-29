@@ -8,14 +8,14 @@ import os
 import uuid
 
 # Add backend to path
-backend_path = os.path.join(os.path.dirname(__file__), "..", "backend")
+backend_path = os.path.join(os.path.dirname(__file__), "../..", "backend")
 sys.path.insert(0, backend_path)
 
 from app.services.vector_store import VectorStoreService
 from app.services.embedding_service import EmbeddingService
 from qdrant_client.http import models as qdrant_models
 
-DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), "..", "data.txt")
+DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), "data.txt")
 
 def parse_data_file():
     """Read and parse data.txt into meaningful chunks."""

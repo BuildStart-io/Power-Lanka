@@ -7,7 +7,7 @@ import sqlite3
 import os
 
 # Path to the database
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "backend", "data", "rag_agent.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "../..", "backend", "data", "rag_agent.db")
 
 def clean_whatsapp_data():
     """Delete all WhatsApp sessions and conversation history."""

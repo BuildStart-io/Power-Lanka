@@ -1,8 +1,9 @@
 import requests
 import sys
+import os
 
 API_URL = "http://localhost:8000"
-FILE_PATH = "data/data.txt"
+FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../vector_db/data.txt")
 
 def upload_file():
     print(f"Uploading {FILE_PATH} to {API_URL}/documents/upload...")

@@ -63,8 +63,7 @@ async def upload_document(
         vector_store.add_products(products, document_id)
 
         # Upsert products into SQLite (Dynamic Data)
-        from ..database import Product
-        from datetime import datetime
+        from ..database import Product, get_sl_time
         
         for p in products:
             p_name = p.get("product_name", "").strip()
@@ -86,7 +85,7 @@ async def upload_document(
                 # Update
                 existing_product.price_lkr = p.get("price_lkr", 0.0)
                 existing_product.available = p.get("available", "Yes")
-                existing_product.last_updated = datetime.utcnow()
+                existing_product.last_updated = get_sl_time()
             else:
                 # Create
                 new_product = Product(

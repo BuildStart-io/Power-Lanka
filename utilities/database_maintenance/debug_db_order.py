@@ -2,9 +2,12 @@ import sys
 import os
 
 # Add project root to path
-sys.path.append(os.getcwd())
+# Add backend directory to path relative to this script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(os.path.join(project_root, 'backend'))
 
-from backend.app.database import get_db, WhatsAppSession, create_order, confirm_order_db, get_pending_order
+from app.database import get_db, WhatsAppSession, create_order, confirm_order_db, get_pending_order
 
 def test_order_flow():
     print("--- Starting Order Flow Test ---")
@@ -16,7 +19,8 @@ def test_order_flow():
     db = next(get_db())
     
     # Ensure session exists (mocking what message handler does)
-    from backend.app.database.database import WhatsAppSession
+    # Ensure session exists (mocking what message handler does)
+    from app.database.database import WhatsAppSession
     session = db.query(WhatsAppSession).filter(WhatsAppSession.phone_number == mock_phone).first()
     if not session:
         print("Creating new session...")
@@ -34,9 +38,11 @@ def test_order_flow():
     print(f"Pending Order ID: {order.id}, Status: {order.status}")
     
     # 3. Add Item (Mock)
-    from backend.app.database.database import add_order_item
+    # 3. Add Item (Mock)
+    from app.database.database import add_order_item
     # Need a product ID
-    from backend.app.database.database import Product
+    # Need a product ID
+    from app.database.database import Product
     product = db.query(Product).first()
     if not product:
         print("❌ No products found! Cannot test order item.")

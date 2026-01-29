@@ -4,8 +4,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import uuid
+import csv
+import io
+from fastapi.responses import StreamingResponse
 
-from ..database import get_db, User, Product, Order, OrderItem, WhatsAppSession
+from ..database import get_db, User, Product, Order, OrderItem, WhatsAppSession, get_sl_time
 from ..database.database import format_price
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -163,6 +166,43 @@ async def get_featured_product(db: Session = Depends(get_db)):
         "delivery_charge": 350
     }
 
+@router.get("/products")
+async def list_products(category_id: Optional[str] = None, db: Session = Depends(get_db)):
+    """List all products, optionally filtered by category (not used yet)."""
+    # In simple mode, we just return all products
+    products = db.query(Product).all()
+    
+    return {
+        "products": [
+            {
+                "id": p.id,
+                "name": p.product_name,
+                "variant": p.variant,
+                "name_si": p.variant, # Mapping variant to name_si for existing frontend compat
+                "price": p.price_lkr,
+                "image_paths": p.image_paths,
+                "is_active": True # Default to true
+            }
+            for p in products
+        ]
+    }
+
+@router.get("/products/{product_id}")
+async def get_product_detail(product_id: str, db: Session = Depends(get_db)):
+    """Get a specific product details including stock (mocked)."""
+    product = db.query(Product).get(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    return {
+        "id": product.id,
+        "name": product.product_name,
+        "name_si": product.variant,
+        "price": product.price_lkr,
+        # Mock phone_stock for compatibility if needed, but we removed it from frontend
+        "phone_stock": []
+    }
+
 # We need imports for File upload
 from fastapi import UploadFile, File
 import shutil
@@ -182,7 +222,7 @@ async def upload_product_image(
         # Save file
         file_extension = Path(file.filename).suffix
         # Use timestamp to avoid collisions
-        unique_filename = f"featured_{int(datetime.utcnow().timestamp())}{file_extension}"
+        unique_filename = f"featured_{int(get_sl_time().timestamp())}{file_extension}"
         file_path = media_dir / unique_filename
         
         with open(file_path, "wb") as buffer:
@@ -320,4 +360,225 @@ async def update_order_status(
     order.status = status_update.status
     db.commit()
     
-    return {"message": "Status updated", "status": order.status}
+class ManualOrderItem(BaseModel):
+    product_id: str
+    quantity: int
+    # phone_model_id is no longer needed for general products
+
+class ManualOrderCreate(BaseModel):
+    phone: str
+    customer_name: str
+    delivery_address: str
+    delivery_city: Optional[str] = None
+    gender: Optional[str] = None
+    items: List[ManualOrderItem]
+    payment_method: str
+    special_note: Optional[str] = None
+
+@router.post("/orders/manual")
+async def create_manual_order(
+    order_data: ManualOrderCreate,
+    db: Session = Depends(get_db)
+):
+    """Create a new order manually from the admin panel."""
+    try:
+        # 1. Get or Create WhatsApp Session for the customer
+        # Sanitize phone number (basic)
+        phone = order_data.phone.strip()
+        
+        session = db.query(WhatsAppSession).filter(WhatsAppSession.phone_number == phone).first()
+        if not session:
+            session = WhatsAppSession(
+                id=str(uuid.uuid4()),
+                phone_number=phone,
+                session_id=str(uuid.uuid4()), # Generate a dummy session ID
+                created_at=get_sl_time(),
+                last_message_at=get_sl_time()
+            )
+            db.add(session)
+            db.commit()
+            db.refresh(session)
+            
+        # 2. Calculate Total & Prepare Items
+        total_amount = 0
+        order_items_db = []
+        
+        for item_data in order_data.items:
+            product = db.query(Product).get(item_data.product_id)
+            if not product:
+                continue
+                
+            unit_price = product.price_lkr
+            item_total = unit_price * item_data.quantity
+            total_amount += item_total
+            
+            order_item = OrderItem(
+                id=str(uuid.uuid4()),
+                order_id=None, # Will set after creating order
+                product_id=product.id,
+                quantity=item_data.quantity,
+                unit_price=unit_price,
+                subtotal=item_total
+            )
+            order_items_db.append(order_item)
+
+        # Add delivery charge (standard 350 for now, or could be dynamic)
+        delivery_charge = 350
+        total_amount += delivery_charge
+        
+        # 3. Create Order
+        new_order = Order(
+            id=str(uuid.uuid4()),
+            session_id=session.id,
+            status="confirmed", # Manual orders are usually confirmed immediately
+            total_amount=total_amount,
+            payment_method=order_data.payment_method,
+            shipping_name=order_data.customer_name,
+            shipping_address=order_data.delivery_address,
+            shipping_district=order_data.delivery_city,
+            created_at=get_sl_time(),
+            updated_at=get_sl_time()
+        )
+        
+        db.add(new_order)
+        db.commit()
+        db.refresh(new_order)
+        
+        # 4. Attach Items
+        for item in order_items_db:
+            item.order_id = new_order.id
+            db.add(item)
+            
+        db.commit()
+        
+        return {"message": "Order created successfully", "order": {"id": new_order.id}}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/orders/export/csv")
+async def export_orders_csv(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Export orders to CSV with filters."""
+    # Build Query
+    query = db.query(Order).join(WhatsAppSession, Order.session_id == WhatsAppSession.id)
+    
+    if status:
+        query = query.filter(Order.status == status)
+        
+    if start_date:
+        # Assuming YYYY-MM-DD format from frontend
+        try:
+            s_date = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(Order.created_at >= s_date)
+        except ValueError:
+            pass
+            
+    if end_date:
+        try:
+            e_date = datetime.strptime(end_date, "%Y-%m-%d")
+            # Add one day to include the end date fully
+            e_date = e_date.replace(hour=23, minute=59, second=59)
+            query = query.filter(Order.created_at <= e_date)
+        except ValueError:
+            pass
+
+    # Order by newest first
+    query = query.order_by(Order.created_at.desc())
+    
+    orders = query.all()
+
+    # Generate CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow([
+        "Order ID",
+        "Date",
+        "Status",
+        "Customer Name",
+        "Phone Number",
+        "Delivery Address",
+        "City/District",
+        "Items Summary",
+        "Item Count",
+        "Total Amount (Rs)",
+        "Payment Method"
+    ])
+    
+    for order in orders:
+        # Get phone number from joined session (although join not explicit in result here, we need to access via relationship if set up, or re-query)
+        # In the query above we did a join but query(Order) only returns Order objects unless we ask for both.
+        # Let's rely on lazy loading/relationship or specific query structure.
+        # To be safe and efficient, let's fix the query to eager load or just fetch since it's lazy by default.
+        # Order model has session_id, but maybe not a direct relationship configured to WhatsAppSession in the audit?
+        # Let's check: Order model has 'session_id = Column(String, ForeignKey("whatsapp_sessions.id"))'
+        # But DOES NOT seem to have a 'session' relationship defined in the code I saw earlier (lines 81-106 of database.py).
+        # Wait, I checked database.py earlier. Line 120 has `order = relationship("Order", back_populates="items")`.
+        # Line 87 is column. 
+        # I did NOT see a relationship to WhatsAppSession in `Order` class.
+        # So I need to query manually or relying on the previous pattern in `list_orders`.
+        
+        # Pattern in list_orders: query(Order, WhatsAppSession).join...
+        # Let's stick to that pattern for safety.
+        pass
+
+    # Re-running query with correct tuple select to match list_orders pattern
+    query = db.query(Order, WhatsAppSession).join(WhatsAppSession, Order.session_id == WhatsAppSession.id)
+    
+    if status:
+        query = query.filter(Order.status == status)
+    if start_date:
+        try:
+            s_date = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(Order.created_at >= s_date)
+        except ValueError: pass
+    if end_date:
+        try:
+            e_date = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            query = query.filter(Order.created_at <= e_date)
+        except ValueError: pass
+        
+    query = query.order_by(Order.created_at.desc())
+    results = query.all()
+    
+    for order, session in results:
+        # Format Items
+        items_list = []
+        for item in order.items:
+            # item.product lazy load
+            p_name = item.product.product_name if item.product else "Unknown"
+            p_var = f" ({item.product.variant})" if item.product and item.product.variant else ""
+            items_list.append(f"{p_name}{p_var} x{item.quantity}")
+        
+        items_summary = " | ".join(items_list)
+        
+        writer.writerow([
+            order.id,
+            order.created_at.strftime("%Y-%m-%d %H:%M"),
+            order.status.upper(),
+            order.shipping_name or "Guest",
+            session.phone_number,
+            order.shipping_address or "",
+            order.shipping_district or "",
+            items_summary,
+            len(order.items),
+            f"{order.total_amount:.2f}",
+            order.payment_method or "COD"
+        ])
+        
+    output.seek(0)
+    
+    filename = f"orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

@@ -2,7 +2,7 @@
 from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import uuid
 
@@ -11,14 +11,20 @@ from ..config import get_settings
 settings = get_settings()
 
 # Ensure data directory exists
-os.makedirs(settings.data_dir, exist_ok=True)
+# Resolve absolute path to 'backend' directory
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ABS_DATA_DIR = os.path.join(BACKEND_DIR, settings.data_dir)
+os.makedirs(ABS_DATA_DIR, exist_ok=True)
 
-DATABASE_URL = f"sqlite:///{settings.data_dir}/rag_agent.db"
+DATABASE_URL = f"sqlite:///{ABS_DATA_DIR}/rag_agent.db"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+def get_sl_time():
+    """Get current time in Sri Lanka Standard Time (UTC+5:30)."""
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
 class Document(Base):
     """Uploaded documents table."""
@@ -31,7 +37,7 @@ class Document(Base):
     file_path = Column(String, nullable=False)
     product_count = Column(Integer, default=0)
     status = Column(String, default="processed")
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    uploaded_at = Column(DateTime, default=get_sl_time)
 
 
 class ConversationMessage(Base):
@@ -43,7 +49,7 @@ class ConversationMessage(Base):
     session_id = Column(String, nullable=False, index=True)
     role = Column(String, nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_sl_time)
 
 
 class WhatsAppSession(Base):
@@ -54,8 +60,8 @@ class WhatsAppSession(Base):
     id = Column(String, primary_key=True)
     phone_number = Column(String, unique=True, nullable=False, index=True)
     session_id = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_message_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_sl_time)
+    last_message_at = Column(DateTime, default=get_sl_time)
 
 
 class Product(Base):
@@ -69,7 +75,7 @@ class Product(Base):
     price_lkr = Column(Float, default=0.0)
     available = Column(String, default="Yes")
     image_paths = Column(Text, nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    last_updated = Column(DateTime, default=get_sl_time, onupdate=get_sl_time)
 
 
 class Order(Base):
@@ -91,8 +97,8 @@ class Order(Base):
     shipping_address = Column(String, nullable=True)
     shipping_district = Column(String, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=get_sl_time)
+    updated_at = Column(DateTime, default=get_sl_time, onupdate=get_sl_time)
 
     # Relationships
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -126,7 +132,7 @@ class User(Base):
     full_name = Column(String, nullable=True)
     is_active = Column(Integer, default=1)
     role = Column(String, default="admin") # admin, staff
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_sl_time)
 
 
 # Create tables

@@ -39,6 +39,10 @@ def get_product_by_name(query: str) -> Optional[Product]:
         if query_lower in product_name_lower:
             return p
             
+        # Score 1.5: Match neglecting spaces (e.g. "deep clean" matches "deepclean")
+        if query_lower.replace(" ", "") in product_name_lower.replace(" ", ""):
+            return p
+
         # Score 2: Word intersection matching
         product_words = set(product_name_lower.split())
         variant_words = set(variant_lower.split())

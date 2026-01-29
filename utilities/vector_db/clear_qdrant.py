@@ -6,7 +6,7 @@ import sys
 import os
 
 # Add backend to path - go up one level from utilites, then into backend
-backend_path = os.path.join(os.path.dirname(__file__), "..", "backend")
+backend_path = os.path.join(os.path.dirname(__file__), "../..", "backend")
 sys.path.insert(0, backend_path)
 
 from app.services.vector_store import VectorStoreService

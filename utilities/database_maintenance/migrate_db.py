@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 
 # Path to database
-BASE_DIR = Path(__file__).resolve().parent
+# Path to database
+BASE_DIR = Path(__file__).resolve().parent.parent.parent / "backend"
 DB_PATH = BASE_DIR / "data" / "rag_agent.db"
 
 def migrate():

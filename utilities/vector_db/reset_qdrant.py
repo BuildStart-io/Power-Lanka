@@ -1,3 +1,11 @@
+import sys
+import os
+
+# Add backend directory to path relative to this script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(os.path.join(project_root, 'backend'))
+
 from qdrant_client import QdrantClient
 from app.config import get_settings
 

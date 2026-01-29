@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import json
 
-from ..database import get_db, Product
+from ..database import get_db, Product, get_sl_time
 
 router = APIRouter(prefix="/admin/products", tags=["Admin Products"])
 
@@ -61,7 +61,7 @@ async def create_or_update_product(
         
         # Save file
         file_extension = Path(image.filename).suffix
-        filename = f"{p_id}_{int(datetime.utcnow().timestamp())}{file_extension}"
+        filename = f"{p_id}_{int(get_sl_time().timestamp())}{file_extension}"
         file_path = media_dir / filename
         
         with open(file_path, "wb") as buffer:
@@ -76,7 +76,7 @@ async def create_or_update_product(
         existing_product.variant = p_variant
         existing_product.price_lkr = price_lkr
         existing_product.available = available
-        existing_product.last_updated = datetime.utcnow()
+        existing_product.last_updated = get_sl_time()
         
         if final_image_path:
             # If there's an existing image, we could append it or replace
@@ -97,7 +97,7 @@ async def create_or_update_product(
             price_lkr=price_lkr,
             available=available,
             image_paths=final_image_path,
-            last_updated=datetime.utcnow()
+            last_updated=get_sl_time()
         )
         db.add(new_product)
         db.commit()
@@ -135,7 +135,7 @@ async def toggle_availability(product_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     
     product.available = "No" if product.available == "Yes" else "Yes"
-    product.last_updated = datetime.utcnow()
+    product.last_updated = get_sl_time()
     db.commit()
     db.refresh(product)
     return {"id": product_id, "available": product.available}

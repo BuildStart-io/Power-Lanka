@@ -1,7 +1,7 @@
 {
     "name": "power-lanka-dashboard",
     "version": "1.0.0",
-    "description": "Admin Dashboard for Power Lanka WhatsApp Sales Agent",
+    "description": "Admin Dashboard for Power Lanka",
     "author": "Power Lanka",
     "license": "MIT",
     "type": "module",
@@ -11,6 +11,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "lucide-vue-next": "^0.563.0",
         "qrcode": "^1.5.4",
         "vue": "^3.4.0",
         "vue-router": "^4.2.0"

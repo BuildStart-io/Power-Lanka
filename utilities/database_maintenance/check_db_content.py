@@ -2,7 +2,7 @@
 import sqlite3
 import os
 
-DB_PATH = "data/rag_agent.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backend/data/rag_agent.db")
 
 def check_db():
     print(f"Checking DB at: {os.path.abspath(DB_PATH)}")

@@ -4,7 +4,7 @@ from datetime import datetime
 import uuid
 import logging
 
-from ..database import get_db, ConversationMessage, WhatsAppSession
+from ..database import get_db, ConversationMessage, WhatsAppSession, get_sl_time
 from ..services import RAGService
 from ..services.wasender_service import send_wasender_message_background
 from ..models import WhatsAppMessage
@@ -96,7 +96,7 @@ async def process_message_internal(
     session_id = wa_session.session_id
 
     # Update last message time
-    wa_session.last_message_at = datetime.utcnow()
+    wa_session.last_message_at = get_sl_time()
     db.commit()
 
     # Get conversation history

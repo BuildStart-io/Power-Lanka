@@ -3,10 +3,8 @@ import sqlite3
 import os
 
 # Path to database
-DB_PATH = '/home/lord/Projects/Power-Lanka-Project/PL_Server/backend/app/data/rag_agent.db'
-if not os.path.exists(DB_PATH):
-    # Try alternate path if running from root or strict path
-    DB_PATH = '/home/lord/Projects/Power-Lanka-Project/PL_Server/backend/data/rag_agent.db'
+# Path to database
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backend/data/rag_agent.db")
 
 print(f"Migrating database at: {DB_PATH}")
 

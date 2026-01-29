@@ -24,6 +24,7 @@ const routes = [
     { path: '/whatsapp', name: 'WhatsApp', component: WhatsAppView, meta: { requiresAuth: true } },
     { path: '/customers', name: 'Customers', component: CustomersView, meta: { requiresAuth: true } },
     { path: '/chat/:phone', name: 'ChatHistory', component: ChatHistoryView, meta: { requiresAuth: true } },
+    { path: '/orders/new', name: 'NewOrder', component: () => import('./views/ManualOrderView.vue'), meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({

@@ -8,7 +8,10 @@ import sys
 import os
 
 # Add the backend directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+# Add the backend directory to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.insert(0, os.path.join(project_root, 'backend'))
 
 from app.services.vector_store import VectorStoreService
 

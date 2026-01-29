@@ -2,7 +2,10 @@ import sys
 import os
 
 # Add backend directory to path
-sys.path.append('/home/lord/Projects/Power-Lanka-Project/PL_Server/backend')
+# Add backend directory to path relative to this script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(os.path.join(project_root, 'backend'))
 
 from app.database import get_db, Order, WhatsAppSession
 

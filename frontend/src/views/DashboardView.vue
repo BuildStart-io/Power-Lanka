@@ -6,7 +6,9 @@
     
     <div v-else class="stats-grid">
       <div class="stat-card">
-        <div class="stat-icon monochrome-emoji">📦</div>
+        <div class="stat-icon">
+          <Package :size="28" />
+        </div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.total_orders }}</div>
           <div class="stat-label">Total Orders</div>
@@ -14,7 +16,9 @@
       </div>
       
       <div class="stat-card highlight">
-        <div class="stat-icon monochrome-emoji">🆕</div>
+        <div class="stat-icon">
+          <Clock :size="28" />
+        </div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.pending_orders }}</div>
           <div class="stat-label">Pending Orders</div>
@@ -22,7 +26,9 @@
       </div>
       
       <div class="stat-card success">
-        <div class="stat-icon monochrome-emoji">💰</div>
+        <div class="stat-icon">
+          <DollarSign :size="28" />
+        </div>
         <div class="stat-info">
           <div class="stat-value">Rs. {{ formatNumber(stats.total_revenue) }}</div>
           <div class="stat-label">Total Revenue</div>
@@ -30,7 +36,9 @@
       </div>
       
       <div class="stat-card">
-        <div class="stat-icon monochrome-emoji">👥</div>
+        <div class="stat-icon">
+          <Users :size="28" />
+        </div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.total_customers }}</div>
           <div class="stat-label">Customers</div>
@@ -38,7 +46,9 @@
       </div>
       
       <div class="stat-card">
-        <div class="stat-icon monochrome-emoji">🛍️</div>
+        <div class="stat-icon">
+          <ShoppingBag :size="28" />
+        </div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.total_items_sold || 0 }}</div>
           <div class="stat-label">Items Sold</div>
@@ -73,7 +83,9 @@
             <div class="images-gallery" v-if="productImages.length > 0">
               <div v-for="(img, index) in productImages" :key="index" class="image-item">
                 <img :src="`${API_BASE}/media/${img}`" :alt="`Product image ${index + 1}`" />
-                <button class="delete-btn" @click="deleteImage(img)" title="Delete image">🗑️</button>
+                <button class="delete-btn" @click="deleteImage(img)" title="Delete image">
+                  <Trash2 :size="16" />
+                </button>
               </div>
             </div>
             
@@ -106,21 +118,27 @@
         <h2>Quick Actions</h2>
         <div class="action-buttons">
           <router-link to="/orders" class="action-card">
-            <div class="action-icon monochrome-emoji">📦</div>
+            <div class="action-icon">
+              <ShoppingBag :size="28" />
+            </div>
             <div class="action-content">
               <div class="action-title">View Orders</div>
               <div class="action-description">Manage and track all customer orders</div>
             </div>
           </router-link>
           <router-link to="/customers" class="action-card">
-            <div class="action-icon monochrome-emoji">👥</div>
+            <div class="action-icon">
+              <Users :size="28" />
+            </div>
             <div class="action-content">
               <div class="action-title">View Customers</div>
               <div class="action-description">Browse customer list and details</div>
             </div>
           </router-link>
           <router-link to="/whatsapp" class="action-card">
-            <div class="action-icon monochrome-emoji">📱</div>
+            <div class="action-icon">
+              <Smartphone :size="28" />
+            </div>
             <div class="action-content">
               <div class="action-title">WhatsApp</div>
               <div class="action-description">Check WhatsApp connection status</div>
@@ -134,9 +152,27 @@
 
 <script>
 import { API_BASE } from '../config'
+import { 
+  Package, 
+  Clock, 
+  DollarSign, 
+  Users, 
+  ShoppingBag, 
+  Trash2, 
+  Smartphone 
+} from 'lucide-vue-next'
 
 export default {
   name: 'DashboardView',
+  components: {
+    Package,
+    Clock,
+    DollarSign,
+    Users,
+    ShoppingBag,
+    Trash2,
+    Smartphone
+  },
   data() {
     return {
       API_BASE,

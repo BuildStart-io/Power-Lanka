@@ -49,7 +49,7 @@ products = [
 df = pd.DataFrame(products)
 
 # Ensure output directory exists
-output_dir = "data"
+output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backend/data")
 os.makedirs(output_dir, exist_ok=True)
 
 # Save to Excel

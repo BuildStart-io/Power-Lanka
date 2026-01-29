@@ -5,7 +5,7 @@ Verify that specific specific details from data.txt are present in Qdrant.
 import sys
 import os
 
-backend_path = os.path.join(os.path.dirname(__file__), "..", "backend")
+backend_path = os.path.join(os.path.dirname(__file__), "../..", "backend")
 sys.path.insert(0, backend_path)
 
 from app.services.vector_store import VectorStoreService

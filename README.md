@@ -6,8 +6,8 @@ An intelligent WhatsApp-based sales assistant for Power Lanka Home Care Solution
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   WhatsApp      │────▶│    Backend      │────▶│    Qdrant       │
-│   (Node.js)     │     │    (FastAPI)    │     │    (Vector DB)  │
+│     WASender    │────▶│    Backend      │────▶│    Qdrant       │
+│    (External)   │     │    (FastAPI)    │     │    (Vector DB)  │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
         ▲                       │
         │                       ▼
@@ -35,14 +35,6 @@ pip install -r requirements.txt
 python3 main.py
 ```
 
-**2. WhatsApp Service**
-
-```bash
-cd whatsapp-service
-npm install
-npm start
-```
-
 **3. Frontend Dashboard**
 
 ```bash
@@ -54,7 +46,7 @@ npm run dev
 ### Docker Setup
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ## 🔧 Environment Variables
@@ -85,10 +77,14 @@ BACKEND_URL=http://localhost:8000
 │   │   ├── prompts/   # YAML prompt templates
 │   │   ├── routers/   # API endpoints
 │   │   └── services/  # RAG, embeddings, vector store
-│   └── data/          # SQLite database
+│   └── data/          # SQLite database (rag_agent.db)
 ├── frontend/          # Vue.js admin dashboard
-├── whatsapp-service/  # WhatsApp Web.js integration
-├── utilites/          # Helper scripts
+├── utilities/         # Maintenance scripts
+│   ├── admin_management/    # User creation scripts
+│   ├── database_maintenance/ # Schema checks & migrations
+│   ├── vector_db/           # Qdrant management
+│   ├── data_scripts/        # Seeding products/data
+│   └── testing_verification/ # Testing tools
 └── docker-compose.yml
 ```
 
@@ -97,8 +93,23 @@ BACKEND_URL=http://localhost:8000
 - **AI Sales Assistant**: Natural language product discovery and ordering
 - **Multi-language Support**: Sinhala (default) and English
 - **Order Management**: Cart, shipping, payment (COD/Bank Transfer)
-- **Admin Dashboard**: Products, orders, and customer management
+- **Admin Dashboard**:
+  - 📊 Real-time Sales Stats
+  - 📝 Manual Order Creation
+  - 📥 CSV Export for Reporting
+  - 🛍️ Product Management
 - **Vector Search**: Semantic product search via Qdrant
+
+## 🧰 Maintenance
+
+You can run maintenance scripts directly from the `utilities` folder:
+
+```bash
+cd utilities
+python3 admin_management/create_admin_user.py
+python3 database_maintenance/check_schema.py
+python3 dev_tools/cli_chat.py
+```
 
 ## 📝 License
 

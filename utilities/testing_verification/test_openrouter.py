@@ -2,7 +2,10 @@ import sys
 import os
 
 # Ensure backend directory is in path
-sys.path.append(os.getcwd())
+# Ensure backend directory is in path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(os.path.join(project_root, 'backend'))
 
 from app.services.rag_service import RAGService
 from app.config import get_settings

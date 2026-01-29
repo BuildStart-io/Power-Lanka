@@ -1,22 +1,30 @@
 <template>
   <div class="manual-order-view animated-page">
     <div class="page-header">
-      <h1> Create Manual Order</h1>
-      <router-link to="/orders" class="btn btn-secondary back-link">← Back to Orders</router-link>
+      <h1><FilePlus class="header-icon" :size="32" /> Create Manual Order</h1>
+      <router-link to="/orders" class="btn btn-secondary back-link">
+        <ArrowLeft :size="18" /> Back to Orders
+      </router-link>
     </div>
 
     <div class="order-form">
       <!-- Customer Info Section -->
       <div class="form-section">
-        <h3>Customer Information</h3>
+        <h3><User :size="20" class="section-icon" /> Customer Information</h3>
         <div class="form-row">
           <div class="form-group">
             <label>Phone Number *</label>
-            <input v-model="customer.phone" type="text" required placeholder="e.g., 0771234567" />
+            <div class="input-wrapper">
+              <Phone :size="16" class="input-icon" />
+              <input v-model="customer.phone" type="text" required placeholder="e.g., 0771234567" />
+            </div>
           </div>
           <div class="form-group">
             <label>Customer Name *</label>
-            <input v-model="customer.name" type="text" required placeholder="Full name" />
+            <div class="input-wrapper">
+              <User :size="16" class="input-icon" />
+              <input v-model="customer.name" type="text" required placeholder="Full name" />
+            </div>
           </div>
         </div>
         <div class="form-row">
@@ -30,57 +38,49 @@
           </div>
           <div class="form-group">
             <label>City</label>
-            <input v-model="customer.city" type="text" placeholder="City" />
+            <div class="input-wrapper">
+              <MapPin :size="16" class="input-icon" />
+              <input v-model="customer.city" type="text" placeholder="City" />
+            </div>
           </div>
         </div>
         <div class="form-group">
           <label>Delivery Address *</label>
-          <textarea v-model="customer.address" required placeholder="Full delivery address"></textarea>
+          <div class="input-wrapper textarea-wrapper">
+            <MapPin :size="16" class="input-icon" />
+            <textarea v-model="customer.address" required placeholder="Full delivery address"></textarea>
+          </div>
         </div>
       </div>
 
       <!-- Order Items Section -->
       <div class="form-section">
-        <h3>Order Items</h3>
+        <h3><ShoppingBag :size="20" class="section-icon" /> Order Items</h3>
         
         <!-- Add Item Form -->
         <div class="add-item-form">
           <div class="form-row">
             <div class="form-group">
-              <label>Category</label>
-              <select v-model="newItem.categoryId" @change="loadCategoryProducts">
-                <option value="">Select category</option>
-                <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                  {{ cat.name }}
-                </option>
-              </select>
-            </div>
-            <div class="form-group">
               <label>Product</label>
               <select v-model="newItem.productId" @change="selectProduct">
                 <option value="">Select product</option>
-                <option v-for="prod in categoryProducts" :key="prod.id" :value="prod.id">
+                <option v-for="prod in products" :key="prod.id" :value="prod.id">
                   {{ prod.name }} - Rs. {{ formatNumber(prod.price) }}
                 </option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Size / Variant</label>
+              <input type="text" :value="selectedProduct ? selectedProduct.name_si : '-'" disabled class="disabled-input" />
+            </div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label>Phone Model</label>
-              <select v-model="newItem.phoneModelId">
-                <option value="">Select phone model</option>
-                <option v-for="stock in productStock" :key="stock.phone_model_id" :value="stock.phone_model_id">
-                  {{ stock.brand }} {{ stock.phone_model }} ({{ stock.stock_quantity }} in stock)
-                </option>
-              </select>
-            </div>
-            <div class="form-group">
+            <div class="form-group qty-group">
               <label>Quantity</label>
               <input v-model.number="newItem.quantity" type="number" min="1" value="1" />
             </div>
             <button type="button" class="btn btn-primary add-btn" @click="addItem" :disabled="!canAddItem">
-               Add Item
+               <Plus :size="18" /> Add Item
             </button>
           </div>
         </div>
@@ -90,24 +90,27 @@
           <div class="item-row" v-for="(item, index) in orderItems" :key="index">
             <div class="item-info">
               <strong>{{ item.productName }}</strong>
-              <span class="phone-model">{{ item.phoneModelName }}</span>
+              <span class="phone-model">{{ item.variant }}</span>
             </div>
             <div class="item-qty">× {{ item.quantity }}</div>
             <div class="item-price">Rs. {{ formatNumber(item.price * item.quantity) }}</div>
-            <button class="btn btn-sm btn-danger" @click="removeItem(index)">🗑️</button>
+            <button class="btn btn-sm btn-danger icon-btn" @click="removeItem(index)">
+              <Trash2 :size="16" />
+            </button>
           </div>
           <div class="items-total">
             <strong>Total: Rs. {{ formatNumber(totalAmount) }}</strong>
           </div>
         </div>
         <div v-else class="empty-items">
-          No items added yet. Use the form above to add products.
+          <ShoppingBag :size="48" class="empty-icon-lg" />
+          <p>No items added yet. Use the form above to add products.</p>
         </div>
       </div>
 
       <!-- Payment Section -->
       <div class="form-section">
-        <h3>Payment & Notes</h3>
+        <h3><CreditCard :size="20" class="section-icon" /> Payment & Notes</h3>
         <div class="form-row">
           <div class="form-group">
             <label>Payment Method *</label>
@@ -119,7 +122,10 @@
         </div>
         <div class="form-group">
           <label>Special Notes</label>
-          <textarea v-model="specialNote" placeholder="Any special instructions..."></textarea>
+          <div class="input-wrapper textarea-wrapper">
+            <FileText :size="16" class="input-icon" />
+            <textarea v-model="specialNote" placeholder="Any special instructions..."></textarea>
+          </div>
         </div>
       </div>
 
@@ -127,11 +133,13 @@
       <div class="form-actions">
         <button 
           type="button" 
-          class="btn btn-primary btn-lg" 
+          class="btn btn-primary btn-lg full-width-mobile" 
           @click="submitOrder"
           :disabled="!canSubmit || submitting"
         >
-          {{ submitting ? ' Creating Order...' : ' Create Order' }}
+          <CheckCircle :size="20" class="mr-2" v-if="!submitting" />
+          <Loader2 :size="20" class="mr-2 spin" v-else />
+          {{ submitting ? 'Creating Order...' : 'Create Order' }}
         </button>
       </div>
     </div>
@@ -140,9 +148,37 @@
 
 <script>
 import { API_BASE } from '../config'
+import { 
+  FilePlus, 
+  ArrowLeft, 
+  User, 
+  Phone, 
+  MapPin, 
+  ShoppingBag, 
+  Plus, 
+  Trash2, 
+  CreditCard, 
+  FileText, 
+  CheckCircle,
+  Loader2
+} from 'lucide-vue-next'
 
 export default {
   name: 'ManualOrderView',
+  components: {
+    FilePlus, 
+    ArrowLeft, 
+    User, 
+    Phone, 
+    MapPin, 
+    ShoppingBag, 
+    Plus, 
+    Trash2, 
+    CreditCard, 
+    FileText, 
+    CheckCircle,
+    Loader2
+  },
   data() {
     return {
       customer: {
@@ -152,14 +188,10 @@ export default {
         address: '',
         city: ''
       },
-      categories: [],
-      categoryProducts: [],
-      productStock: [],
+      products: [],
       selectedProduct: null,
       newItem: {
-        categoryId: '',
         productId: '',
-        phoneModelId: '',
         quantity: 1
       },
       orderItems: [],
@@ -170,7 +202,7 @@ export default {
   },
   computed: {
     canAddItem() {
-      return this.newItem.productId && this.newItem.phoneModelId && this.newItem.quantity > 0
+      return this.newItem.productId && this.newItem.quantity > 0
     },
     totalAmount() {
       return this.orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
@@ -183,46 +215,26 @@ export default {
     }
   },
   async mounted() {
-    await this.loadCategories()
+    await this.loadProducts()
   },
   methods: {
-    async loadCategories() {
+    async loadProducts() {
       try {
         const token = localStorage.getItem('admin_token')
-        const res = await fetch(`${API_BASE}/admin/categories`, {
+        // Using existing endpoint which lists products.
+        const res = await fetch(`${API_BASE}/admin/products`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         if (res.ok) {
           const data = await res.json()
-          this.categories = data.categories.filter(c => c.is_active)
-        }
-      } catch (err) {
-        console.error('Failed to load categories:', err)
-      }
-    },
-    async loadCategoryProducts() {
-      if (!this.newItem.categoryId) {
-        this.categoryProducts = []
-        return
-      }
-      try {
-        const token = localStorage.getItem('admin_token')
-        const res = await fetch(`${API_BASE}/admin/products?category_id=${this.newItem.categoryId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          this.categoryProducts = data.products.filter(p => p.is_active)
+          this.products = data.products.filter(p => p.is_active !== false)
         }
       } catch (err) {
         console.error('Failed to load products:', err)
       }
-      this.newItem.productId = ''
-      this.productStock = []
     },
     async selectProduct() {
       if (!this.newItem.productId) {
-        this.productStock = []
         this.selectedProduct = null
         return
       }
@@ -234,31 +246,24 @@ export default {
         if (res.ok) {
           const product = await res.json()
           this.selectedProduct = product
-          this.productStock = product.phone_stock.filter(s => s.stock_quantity > 0)
         }
       } catch (err) {
         console.error('Failed to load product:', err)
       }
-      this.newItem.phoneModelId = ''
     },
     addItem() {
       if (!this.canAddItem) return
       
-      const stock = this.productStock.find(s => s.phone_model_id === this.newItem.phoneModelId)
-      
       this.orderItems.push({
         productId: this.selectedProduct.id,
         productName: this.selectedProduct.name,
-        phoneModelId: this.newItem.phoneModelId,
-        phoneModelName: `${stock.brand} ${stock.phone_model}`,
+        variant: this.selectedProduct.name_si, // Using name_si field for variant in view logic
         quantity: this.newItem.quantity,
         price: this.selectedProduct.price
       })
       
       // Reset form
-      this.newItem = { categoryId: '', productId: '', phoneModelId: '', quantity: 1 }
-      this.categoryProducts = []
-      this.productStock = []
+      this.newItem = { productId: '', quantity: 1 }
       this.selectedProduct = null
     },
     removeItem(index) {
@@ -284,7 +289,6 @@ export default {
             gender: this.customer.gender || null,
             items: this.orderItems.map(item => ({
               product_id: item.productId,
-              phone_model_id: item.phoneModelId,
               quantity: item.quantity
             })),
             payment_method: this.paymentMethod,
@@ -572,11 +576,81 @@ export default {
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Icon & Input Styles */
+.header-icon {
+  color: hsl(var(--primary));
+  margin-right: 0.75rem;
+}
+
+.section-icon {
+  margin-right: 0.5rem;
+  color: hsl(var(--primary));
+  vertical-align: text-bottom;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 1rem;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+}
+
+.input-wrapper input,
+.input-wrapper textarea {
+  padding-left: 2.75rem; /* Space for icon */
+}
+
+/* Specific adjustment for textarea icon */
+.textarea-wrapper .input-icon {
+  top: 1rem;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  aspect-ratio: 1;
+}
+
+.mr-2 { margin-right: 0.5rem; }
+
+.empty-icon-lg {
+  color: hsl(var(--muted-foreground) / 0.3);
+  margin-bottom: 1rem;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .full-width-mobile {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
-  to {
-    opacity: 1;
-  }
+}
+
+.disabled-input {
+  background: hsl(var(--muted) / 0.3);
+  color: hsl(var(--muted-foreground));
+  cursor: not-allowed;
 }
 </style>

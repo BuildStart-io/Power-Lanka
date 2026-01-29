@@ -10,22 +10,28 @@
         </div>
         <nav>
           <router-link to="/" class="nav-link" :class="{ active: $route.path === '/' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
-            Dashboard
+            <LayoutDashboard :size="20" />
+            <span>Dashboard</span>
           </router-link>
           <router-link to="/orders" class="nav-link" :class="{ active: $route.path === '/orders' }" @click="closeMobileMenuOnClick">
-            Orders
+            <ShoppingBag :size="20" />
+            <span>Orders</span>
           </router-link>
           <router-link to="/products" class="nav-link" :class="{ active: $route.path === '/products' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
-            Products
+            <Package :size="20" />
+            <span>Products</span>
           </router-link>
           <router-link to="/whatsapp" class="nav-link" :class="{ active: $route.path === '/whatsapp' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
-            WhatsApp
+            <MessageCircle :size="20" />
+            <span>WhatsApp</span>
           </router-link>
           <router-link to="/customers" class="nav-link" :class="{ active: $route.path === '/customers' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
-            Customers
+            <Users :size="20" />
+            <span>Customers</span>
           </router-link>
           <router-link to="/admins" class="nav-link" :class="{ active: $route.path === '/admins' }" @click="closeMobileMenuOnClick" v-if="userRole === 'admin'">
-            Admins
+            <UserCog :size="20" />
+            <span>Admins</span>
           </router-link>
         </nav>
         <div style="position: absolute; bottom: 1.5rem; left: 1.5rem; right: 1.5rem;">
@@ -45,13 +51,13 @@
           <ThemeToggle />
           <div class="profile-menu">
             <button @click="toggleProfileMenu" class="profile-button glass">
-              <span class="profile-icon">👤</span>
+              <User :size="20" />
               <span class="profile-name">{{ adminName }}</span>
               <span class="dropdown-arrow">▼</span>
             </button>
             <div v-if="showProfileMenu" class="profile-dropdown glass-card">
               <button @click="logout" class="profile-dropdown-item logout-item">
-                 Logout
+                 <LogOut :size="16" class="mr-2" /> Logout
               </button>
             </div>
           </div>
@@ -68,10 +74,32 @@
 <script>
 import ThemeToggle from './components/ThemeToggle.vue'
 import { useTheme } from './composables/useTheme'
+import { 
+  LayoutDashboard, 
+  ShoppingBag, 
+  Package, 
+  MessageCircle, 
+  Users, 
+  UserCog, 
+  LogOut, 
+  User, 
+  Menu, 
+  X 
+} from 'lucide-vue-next'
 
 export default {
   components: {
-    ThemeToggle
+    ThemeToggle,
+    LayoutDashboard,
+    ShoppingBag,
+    Package,
+    MessageCircle,
+    Users,
+    UserCog,
+    LogOut,
+    User,
+    Menu,
+    X
   },
   name: 'App',
   data() {
@@ -362,5 +390,18 @@ export default {
   .top-header {
     margin-bottom: 0.75rem;
   }
+}
+
+/* Add styles for nav icons */
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logout-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 </style>

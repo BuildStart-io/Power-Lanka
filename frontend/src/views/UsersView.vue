@@ -3,7 +3,7 @@
     <div class="page-header">
       <h1>👥 Staff Management</h1>
       <button class="btn btn-primary add-user-btn" @click="openAddModal">
-        Add New Admin
+        Add New User
       </button>
     </div>
 
@@ -24,8 +24,11 @@
           <div class="user-info">
             <div class="user-avatar">👤</div>
             <div>
-              <h3>{{ user.full_name || 'Admin User' }}</h3>
-              <p class="user-email">{{ user.email }}</p>
+            <h3>{{ user.full_name || 'Admin User' }}</h3>
+              <p class="user-email">
+                {{ user.email }}
+                <span :class="['role-badge', user.role || 'admin']">{{ user.role || 'admin' }}</span>
+              </p>
             </div>
           </div>
           <div class="user-date">Joined: {{ formatDate(user.created_at) }}</div>
@@ -33,7 +36,7 @@
         
         <div class="user-actions">
           <button class="btn btn-sm btn-danger" @click="confirmDelete(user)">
-            🗑️ Remove Access
+             Remove Access
           </button>
         </div>
       </div>
@@ -42,7 +45,7 @@
     <!-- Add User Modal -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
-        <h2>Add New Admin Account</h2>
+        <h2>Add New Team Member</h2>
         <form @submit.prevent="saveUser">
           <div class="form-group">
             <label>Full Name</label>
@@ -63,6 +66,13 @@
             />
           </div>
           <div class="form-group">
+            <label>Role</label>
+            <select v-model="form.role" required>
+              <option value="staff">Staff (Limited Access)</option>
+              <option value="admin">Admin (Full Access)</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Password</label>
             <input 
               v-model="form.password" 
@@ -74,7 +84,7 @@
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" @click="closeModal">Cancel</button>
             <button type="submit" class="btn btn-primary" :disabled="saving">
-              {{ saving ? 'Creating...' : 'Create Admin Account' }}
+              {{ saving ? 'Creating...' : 'Create Account' }}
             </button>
           </div>
         </form>
@@ -97,7 +107,8 @@ export default {
       form: {
         full_name: '',
         email: '',
-        password: ''
+        password: '',
+        role: 'staff' // Default to staff
       }
     }
   },
@@ -122,7 +133,8 @@ export default {
       this.form = {
         full_name: '',
         email: '',
-        password: ''
+        password: '',
+        role: 'staff'
       }
       this.showModal = true
     },
@@ -297,6 +309,39 @@ export default {
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
+}
+
+select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+}
+
+.role-badge {
+  display: inline-block;
+  font-size: 0.7em;
+  padding: 0.2em 0.6em;
+  border-radius: 1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-left: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.role-badge.admin {
+  background: hsl(var(--primary) / 0.2);
+  color: hsl(var(--primary));
+  border: 1px solid hsl(var(--primary) / 0.3);
+}
+
+.role-badge.staff {
+  background: hsl(var(--muted) / 0.3);
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
 }
 
 .loading, .empty-state {

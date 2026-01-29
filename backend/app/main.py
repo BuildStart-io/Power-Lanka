@@ -32,8 +32,8 @@ os.makedirs(settings.data_dir, exist_ok=True)
 os.makedirs("media", exist_ok=True)
 
 app = FastAPI(
-    title="RAG Agent API",
-    description="AI-powered RAG system for product catalog queries",
+    title="PowerLanka API",
+    description="AI-powered RAG system for PowerLanka",
     version="1.0.0",
 )
 
@@ -82,7 +82,7 @@ app.include_router(admin_chat_router)
 async def root():
     """Root endpoint - API info."""
     return {
-        "name": "RAG Agent API",
+        "name": "PowerLanka API",
         "version": "1.0.0",
         "status": "running",
         "endpoints": {

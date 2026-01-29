@@ -4,9 +4,11 @@
       <h1>Orders</h1>
       <div class="header-right">
         <button @click="showExportPanel = !showExportPanel" class="btn btn-secondary export-toggle-btn">
-          Export CSV
+          <Download :size="18" class="mr-2" /> Export CSV
         </button>
-        <router-link to="/orders/new" class="btn btn-primary new-order-btn">New Order</router-link>
+        <router-link to="/orders/new" class="btn btn-primary new-order-btn">
+          <Plus :size="18" class="mr-2" /> New Order
+        </router-link>
       </div>
     </div>
 
@@ -50,7 +52,7 @@
           :class="{ active: statusFilter === tab.value }"
           @click="statusFilter = tab.value; loadOrders()"
         >
-          {{ tab.icon }} {{ tab.label }}
+          <component :is="tab.icon" :size="16" /> {{ tab.label }}
           <span v-if="tab.count" class="tab-count">{{ tab.count }}</span>
         </button>
       </div>
@@ -59,7 +61,7 @@
     <div v-if="loading" class="loading">Loading orders...</div>
 
     <div v-else-if="orders.length === 0" class="empty-state">
-      <div class="empty-icon">📭</div>
+      <div class="empty-icon"><Inbox :size="64" /></div>
       <p>No orders found</p>
     </div>
 
@@ -82,12 +84,14 @@
             <span :class="['status-badge', order.status]">{{ order.status }}</span>
           </div>
           <div class="order-date">{{ formatDate(order.created_at) }}</div>
-          <span class="expand-icon">{{ expandedOrder === order.id ? '▼' : '▶' }}</span>
+          <span class="expand-icon">
+            <component :is="expandedOrder === order.id ? 'ChevronDown' : 'ChevronRight'" :size="20" />
+          </span>
         </div>
 
         <div v-if="expandedOrder === order.id" class="order-details">
           <div class="detail-section" v-if="orderDetails[order.id]">
-            <h4>Delivery Details</h4>
+            <h4><MapPin :size="18" class="inline-icon" /> Delivery Details</h4>
             <p v-if="orderDetails[order.id].delivery_address"><strong>Address:</strong> {{ orderDetails[order.id].delivery_address }}</p>
             <p v-if="orderDetails[order.id].delivery_city"><strong>City:</strong> {{ orderDetails[order.id].delivery_city }}</p>
             <p v-if="orderDetails[order.id].payment_method"><strong>Payment:</strong> {{ orderDetails[order.id].payment_method === 'cod' ? 'Cash on Delivery' : 'Bank Transfer' }}</p>
@@ -95,7 +99,7 @@
           </div>
 
           <div class="detail-section" v-if="orderDetails[order.id]">
-            <h4>Order Items</h4>
+            <h4><ShoppingBag :size="18" class="inline-icon" /> Order Items</h4>
             <ul class="items-list">
               <li v-for="item in orderDetails[order.id].items" :key="item.id">
                 {{ item.category_name }} ({{ item.phone_model }}) × {{ item.quantity }}
@@ -120,7 +124,7 @@
           </div>
 
           <div class="order-actions">
-            <h4>🔄 Update Status</h4>
+            <h4><RefreshCw :size="18" class="inline-icon" /> Update Status</h4>
             <div class="status-buttons">
               <button 
                 v-for="status in availableStatuses" 
@@ -130,14 +134,14 @@
                 :disabled="order.status === status.value"
                 @click="updateStatus(order.id, status.value)"
               >
-                {{ status.icon }} {{ status.label }}
+                <component :is="status.icon" :size="14" class="mr-1" /> {{ status.label }}
               </button>
             </div>
           </div>
 
           <div class="order-links">
             <router-link :to="`/chat/${order.phone}`" class="btn btn-secondary btn-sm">
-              View Chat History
+              <MessageCircle :size="16" class="mr-2" /> View Chat History
             </router-link>
           </div>
         </div>
@@ -148,9 +152,47 @@
 
 <script>
 import { API_BASE } from '../config'
+import { 
+  Download, 
+  Plus, 
+  List, 
+  CheckCircle, 
+  Clock, 
+  Truck, 
+  PackageCheck, 
+  XCircle, 
+  ChevronDown, 
+  ChevronRight, 
+  MapPin, 
+  CreditCard, 
+  StickyNote, 
+  ShoppingBag, 
+  RefreshCw, 
+  MessageCircle,
+  Inbox
+} from 'lucide-vue-next'
 
 export default {
   name: 'OrdersView',
+  components: {
+    Download, 
+    Plus, 
+    List, 
+    CheckCircle, 
+    Clock, 
+    Truck, 
+    PackageCheck, 
+    XCircle, 
+    ChevronDown, 
+    ChevronRight, 
+    MapPin, 
+    CreditCard, 
+    StickyNote, 
+    ShoppingBag, 
+    RefreshCw, 
+    MessageCircle,
+    Inbox
+  },
   data() {
     return {
       orders: [],
@@ -166,19 +208,19 @@ export default {
         status: ''
       },
       statusTabs: [
-        { value: '', label: 'All', icon: '', count: 0 },
-        { value: 'confirmed', label: 'Confirmed', icon: '', count: 0 },
-        { value: 'processing', label: 'Processing', icon: '', count: 0 },
-        { value: 'shipped', label: 'Shipped', icon: '', count: 0 },
-        { value: 'completed', label: 'Completed', icon: '', count: 0 },
-        { value: 'cancelled', label: 'Cancelled', icon: '', count: 0 }
+        { value: '', label: 'All', icon: List, count: 0 },
+        { value: 'confirmed', label: 'Confirmed', icon: CheckCircle, count: 0 },
+        { value: 'processing', label: 'Processing', icon: Clock, count: 0 },
+        { value: 'shipped', label: 'Shipped', icon: Truck, count: 0 },
+        { value: 'completed', label: 'Completed', icon: PackageCheck, count: 0 },
+        { value: 'cancelled', label: 'Cancelled', icon: XCircle, count: 0 }
       ],
       availableStatuses: [
-        { value: 'confirmed', label: 'Confirmed', icon: '' },
-        { value: 'processing', label: 'Processing', icon: '' },
-        { value: 'shipped', label: 'Shipped', icon: '' },
-        { value: 'completed', label: 'Completed', icon: '' },
-        { value: 'cancelled', label: 'Cancelled', icon: '' }
+        { value: 'confirmed', label: 'Confirmed', icon: CheckCircle },
+        { value: 'processing', label: 'Processing', icon: Clock },
+        { value: 'shipped', label: 'Shipped', icon: Truck },
+        { value: 'completed', label: 'Completed', icon: PackageCheck },
+        { value: 'cancelled', label: 'Cancelled', icon: XCircle }
       ]
     }
   },
@@ -362,7 +404,14 @@ export default {
   text-decoration: none !important;
   font-weight: 700;
   border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+
+.mr-2 { margin-right: 0.5rem; }
+.mr-1 { margin-right: 0.25rem; }
+.inline-icon { vertical-align: text-bottom; margin-right: 0.5rem; display: inline-block; }
 
 /* Export Panel Styles */
 .export-panel {
