@@ -44,21 +44,38 @@ app = FastAPI(title="CLI Chat Server", lifespan=lifespan)
 async def root():
     return RedirectResponse(url="/docs")
 
+class Key(BaseModel):
+    cleanedSenderPn: str
+
+class MessageItem(BaseModel):
+    key: Key
+    messageBody: str
+
+class DataPayload(BaseModel):
+    messages: MessageItem
+
 class WebhookPayload(BaseModel):
-    fromNumber: str
-    body: str
+    event: str
+    data: DataPayload
 
 @app.post("/chat")
 async def chat_endpoint(payload: WebhookPayload):
     """
     Simulates the webhook endpoint.
-    Expects JSON: { "fromNumber": "...", "body": "..." }
+    Expects complex JSON structure from WhatsApp gateway.
     """
     global rag_service
     if not rag_service:
         return {"error": "RAG Service not initialized"}
     
-    print(f"\n[POST] Received from {payload.fromNumber}: {payload.body}")
+    # Extract data from nested structure
+    try:
+        from_number = payload.data.messages.key.cleanedSenderPn
+        message_body = payload.data.messages.messageBody
+    except AttributeError:
+        return {"error": "Invalid payload structure"}
+
+    print(f"\n[POST] Received from {from_number}: {message_body}")
     
     # RAG Service expects conversation history.
     # For this simple CLI/Test server, we might not maintain history per user 
@@ -70,9 +87,9 @@ async def chat_endpoint(payload: WebhookPayload):
     # Let's keep it simple: no memory for this test server.
     
     response_data = rag_service.generate_response(
-        query=payload.body,
+        query=message_body,
         conversation_history=[], # Stateless for this test
-        phone_number=payload.fromNumber
+        phone_number=from_number
     )
     
     response_text = response_data.get("response", "")
@@ -80,7 +97,7 @@ async def chat_endpoint(payload: WebhookPayload):
     
     return {
         "response": response_text,
-        "request_body": payload.body
+        "request_body": message_body
     }
 
 @app.get("/health")
