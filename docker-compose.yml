@@ -18,6 +18,7 @@ services:
       - UPLOAD_DIR=/app/uploads
       - DATA_DIR=/app/data
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-5}
+      - WASENDER_TOKEN=${WASENDER_TOKEN}
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
