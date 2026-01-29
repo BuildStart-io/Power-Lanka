@@ -1,7 +1,7 @@
 <template>
   <div class="users-view animated-page">
     <div class="page-header">
-      <h1>👥 Staff Management</h1>
+      <h1>👥 User Management</h1>
       <button class="btn btn-primary add-user-btn" @click="openAddModal">
         Add New User
       </button>
@@ -27,7 +27,9 @@
             <h3>{{ user.full_name || 'Admin User' }}</h3>
               <p class="user-email">
                 {{ user.email }}
-                <span :class="['role-badge', user.role || 'admin']">{{ user.role || 'admin' }}</span>
+                <span :class="['role-badge', (user.role || 'admin').toLowerCase()]">
+                  {{ (user.role || 'admin').charAt(0).toUpperCase() + (user.role || 'admin').slice(1) }}
+                </span>
               </p>
             </div>
           </div>
@@ -35,6 +37,9 @@
         </div>
         
         <div class="user-actions">
+          <button class="btn btn-sm btn-secondary" @click="openEditModal(user)">
+             Edit
+          </button>
           <button class="btn btn-sm btn-danger" @click="confirmDelete(user)">
              Remove Access
           </button>
@@ -90,6 +95,42 @@
         </form>
       </div>
     </div>
+    <!-- Edit User Modal -->
+    <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
+      <div class="modal">
+        <h2>Manage User: {{ editingUser?.full_name }}</h2>
+        <form @submit.prevent="updateUser">
+          
+          <div class="form-group">
+            <label>Role</label>
+            <select v-model="editForm.role" required>
+              <option value="staff">Staff (Limited Access)</option>
+              <option value="admin">Admin (Full Access)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Reset Password</label>
+            <input 
+              v-model="editForm.password" 
+              type="password" 
+              placeholder="Leave empty to keep current"
+            />
+            <small style="color: hsl(var(--muted-foreground)); display: block; margin-top: 0.25rem;">
+              Only enter a value if you want to change the password.
+            </small>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" @click="closeEditModal">Cancel</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              {{ saving ? 'Updating...' : 'Save Changes' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -104,11 +145,17 @@ export default {
       loading: true,
       saving: false,
       showModal: false,
+      showEditModal: false,
+      editingUser: null,
       form: {
         full_name: '',
         email: '',
         password: '',
-        role: 'staff' // Default to staff
+        role: 'staff'
+      },
+      editForm: {
+        role: 'staff',
+        password: ''
       }
     }
   },
@@ -141,6 +188,18 @@ export default {
     closeModal() {
       this.showModal = false
     },
+    openEditModal(user) {
+      this.editingUser = user
+      this.editForm = {
+        role: user.role || 'admin', // Default fallbacks
+        password: ''
+      }
+      this.showEditModal = true
+    },
+    closeEditModal() {
+      this.showEditModal = false
+      this.editingUser = null
+    },
     async saveUser() {
       this.saving = true
       try {
@@ -160,6 +219,41 @@ export default {
       } catch (err) {
         console.error('Error saving user:', err)
         alert('Check backend connection')
+      } finally {
+        this.saving = false
+      }
+    },
+    async updateUser() {
+      if (!this.editingUser) return
+      this.saving = true
+      
+      try {
+        // 1. Update Role (always sent)
+        const roleRes = await fetch(`${API_BASE}/admin/users/${this.editingUser.id}/role`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: this.editForm.role })
+        })
+
+        if (!roleRes.ok) throw new Error('Failed to update role')
+
+        // 2. Update Password (only if provided)
+        if (this.editForm.password) {
+          const passRes = await fetch(`${API_BASE}/admin/users/${this.editingUser.id}/password`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: this.editForm.password })
+          })
+          if (!passRes.ok) throw new Error('Failed to update password')
+        }
+
+        await this.loadUsers()
+        this.closeEditModal()
+        alert('User updated successfully')
+        
+      } catch (err) {
+        console.error('Update failed:', err)
+        alert('Failed to update user. See console for details.')
       } finally {
         this.saving = false
       }
@@ -267,6 +361,8 @@ export default {
 
 .user-actions {
   margin-left: 2rem;
+  display: flex;
+  gap: 0.5rem;
 }
 
 /* Modal styles */
@@ -351,6 +447,7 @@ select {
 
 .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
 
+/* Responsive Adjustments */
 @media (max-width: 640px) {
   .user-card {
     flex-direction: column;
@@ -367,6 +464,7 @@ select {
   .user-actions {
     width: 100%;
     margin-left: 0;
+    flex-direction: column;
   }
   
   .user-actions .btn {

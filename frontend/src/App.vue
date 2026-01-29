@@ -119,7 +119,13 @@ export default {
     },
     userRole() {
        const user = localStorage.getItem('admin_user')
-       return user ? (JSON.parse(user).role || 'admin') : 'admin'
+       if (!user) return 'staff'
+       try {
+         const userData = JSON.parse(user)
+         return (userData.role || 'staff').toLowerCase()
+       } catch (e) {
+         return 'staff'
+       }
     }
   },
   watch: {

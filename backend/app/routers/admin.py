@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     full_name: Optional[str]
+    role: Optional[str]
     is_active: int
     created_at: datetime
 
@@ -94,6 +95,45 @@ async def delete_user(user_id: str, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully"}
+
+class UserUpdatePassword(BaseModel):
+    password: str
+
+class UserUpdateRole(BaseModel):
+    role: str
+
+@router.put("/users/{user_id}/password")
+async def update_user_password(
+    user_id: str, 
+    data: UserUpdatePassword,
+    db: Session = Depends(get_db)
+):
+    """Reset a user's password."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.password_hash = data.password
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+@router.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: str, 
+    data: UserUpdateRole,
+    db: Session = Depends(get_db)
+):
+    """Update a user's role."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if data.role not in ["admin", "staff"]:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    
+    user.role = data.role
+    db.commit()
+    return {"message": "Role updated successfully"}
 
 # --- Dashboard Stats & Product Endpoints ---
 
