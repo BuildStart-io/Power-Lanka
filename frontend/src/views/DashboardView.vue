@@ -72,7 +72,7 @@
             
             <div class="images-gallery" v-if="productImages.length > 0">
               <div v-for="(img, index) in productImages" :key="index" class="image-item">
-                <img :src="`${API_BASE}/images/${img}`" :alt="`Product image ${index + 1}`" />
+                <img :src="`${API_BASE}/media/${img}`" :alt="`Product image ${index + 1}`" />
                 <button class="delete-btn" @click="deleteImage(img)" title="Delete image">🗑️</button>
               </div>
             </div>

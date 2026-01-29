@@ -19,7 +19,7 @@
         <div class="category-image">
           <img 
             v-if="category.image_path" 
-            :src="`${API_BASE.replace('/api', '')}/images/${category.image_path}`" 
+            :src="`${API_BASE}/media/${category.image_path}`" 
             :alt="category.name"
           />
           <div v-else class="no-image">📁</div>

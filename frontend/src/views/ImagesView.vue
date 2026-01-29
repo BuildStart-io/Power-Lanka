@@ -55,7 +55,7 @@
         :class="{ primary: image.is_primary }"
       >
         <div class="image-preview">
-          <img :src="`${API_BASE}/images/${image.image_path}`" :alt="image.category_name" />
+          <img :src="`${API_BASE}/media/${image.image_path}`" :alt="image.category_name" />
           <span v-if="image.is_primary" class="primary-badge">⭐ Primary</span>
         </div>
         <div class="image-info">

@@ -18,7 +18,7 @@
     <div v-else class="tshirts-grid">
       <div v-for="tshirt in filteredTshirts" :key="tshirt.id" class="tshirt-card" :class="{ inactive: !tshirt.is_active }">
         <div class="tshirt-image">
-          <img v-if="tshirt.image_path" :src="`${API_BASE.replace('/api', '')}/images/${tshirt.image_path}`" :alt="tshirt.name" />
+          <img v-if="tshirt.image_path" :src="`${API_BASE}/media/${tshirt.image_path}`" :alt="tshirt.name" />
           <div v-else class="no-image">👕</div>
         </div>
         <div class="tshirt-info">
