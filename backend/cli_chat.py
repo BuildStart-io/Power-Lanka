@@ -25,6 +25,9 @@ from app.services.rag_service import RAGService
 
 from contextlib import asynccontextmanager
 from fastapi.responses import RedirectResponse
+from app.database import SessionLocal, WhatsAppSession, ConversationMessage
+import uuid
+from datetime import datetime
 
 # Initialize Service
 # Global instance to avoid re-init on every request if expensive
@@ -90,24 +93,86 @@ async def chat_endpoint(payload: WebhookPayload):
 
     print(f"\n[POST] Received from {from_number}: {message_body}")
     
-    # RAG Service expects conversation history.
-    # For this simple CLI/Test server, we might not maintain history per user 
-    # unless we implement a simple dict memory, or just pass empty history.
-    # The real app uses the DB for history.
-    
-    # We will pass empty history for now to test single-turn RAG, 
-    # or we could attempt to fetch from DB if we imported the DB logic.
-    # Let's keep it simple: no memory for this test server.
-    
-    response_data = rag_service.generate_response(
-        query=message_body,
-        conversation_history=[], # Stateless for this test
-        phone_number=from_number
-    )
-    
-    response_text = response_data.get("response", "")
-    response_text = response_data.get("response", "")
-    print(f"[RESP] Bot: {response_text}")
+    # Initialize DB Session
+    db = SessionLocal()
+    response_text = ""
+    try:
+        # Standardize phone number for lookup
+        lookup_number = from_number.strip()
+        
+        # Get or create WhatsApp session
+        wa_session = db.query(WhatsAppSession).filter(WhatsAppSession.phone_number == lookup_number).first()
+        
+        if not wa_session:
+            print(f"[DB] Creating NEW session for {lookup_number}")
+            wa_session = WhatsAppSession(
+                id=str(uuid.uuid4()),
+                phone_number=lookup_number,
+                session_id=str(uuid.uuid4()),
+            )
+            db.add(wa_session)
+            db.commit()
+            db.refresh(wa_session)
+        else:
+            print(f"[DB] Found EXISTING session: {wa_session.session_id}")
+        
+        # Update last message time
+        wa_session.last_message_at = datetime.utcnow()
+        db.commit()
+
+        # Get conversation history
+        history_msgs = db.query(ConversationMessage).filter(
+            ConversationMessage.session_id == wa_session.session_id
+        ).order_by(ConversationMessage.created_at.asc()).all()
+        
+        print(f"[DB] Loaded {len(history_msgs)} history messages")
+        
+        conversation_history = [{"role": m.role, "content": m.content} for m in history_msgs]
+        
+        # Generate Response
+        # Note: rag_service tools (add_to_cart) create their own DB storage. 
+        # They need the correct phone number to look up this SAME session.
+        response_data = rag_service.generate_response(
+            query=message_body,
+            conversation_history=conversation_history,
+            phone_number=lookup_number
+        )
+        
+        response_text = response_data.get("response", "")
+        print(f"[RESP] Bot: {response_text}")
+        
+        # Save messages to DB
+        user_msg = ConversationMessage(
+            id=str(uuid.uuid4()),
+            session_id=wa_session.session_id,
+            role="user",
+            content=message_body
+        )
+        db.add(user_msg)
+        
+        assistant_msg = ConversationMessage(
+            id=str(uuid.uuid4()),
+            session_id=wa_session.session_id,
+            role="assistant",
+            content=response_text
+        )
+        db.add(assistant_msg)
+        db.commit()
+        print("[DB] Saved chat messages committed.")
+
+    except Exception as e:
+        print(f"Database Error: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback if DB fails
+        response_data = rag_service.generate_response(
+            query=message_body,
+            conversation_history=[],
+            phone_number=from_number
+        )
+        response_text = response_data.get("response", "")
+    finally:
+        db.close()
 
     # Send response to WhatsApp via WASender API
     wa_api_url = "https://wasenderapi.com/api/send-message"
