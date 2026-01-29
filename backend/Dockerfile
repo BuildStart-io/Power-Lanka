@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
+COPY cli_chat.py .
 
 # Create directories for data and uploads
 RUN mkdir -p /app/data /app/uploads /app/media
@@ -29,4 +30,4 @@ RUN mkdir -p /app/data /app/uploads /app/media
 EXPOSE 8000
 
 # Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "cli_chat.py"]

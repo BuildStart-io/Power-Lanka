@@ -83,9 +83,13 @@ async def chat_endpoint(payload: WebhookPayload):
         "request_body": payload.body
     }
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 if __name__ == "__main__":
-    print("Starting Setup Server on port 8001...")
-    print("Swagger Docs available at: http://localhost:8001/docs")
-    print("Send POST requests to: http://localhost:8001/chat")
-    # Run on 8001 to avoid modifying the main app port logic
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    print("Starting Setup Server on port 8000...")
+    print("Swagger Docs available at: http://localhost:8000/docs")
+    print("Send POST requests to: http://localhost:8000/chat")
+    # Run on 8000 to match docker-compose configuration
+    uvicorn.run(app, host="0.0.0.0", port=8000)
