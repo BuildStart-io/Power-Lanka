@@ -355,9 +355,10 @@ class RAGService:
         return "\n".join(history_parts)
 
     def _execute_tool_calls(self, text: str, phone: str) -> str:
-        """Detect and execute tool calls in the response text."""
-        # Pattern to match: function_name(arg1, arg2...)
-        # We look for specific known tool names
+        """
+        Detect and execute tool calls in the response text.
+        Uses a stack-based parser to handle nested parentheses correctly.
+        """
         tools = {
             "add_to_cart": add_to_cart,
             "view_cart": view_cart,
@@ -365,75 +366,87 @@ class RAGService:
             "confirm_order": confirm_order
         }
         
-        # This regex is a bit naive but works for standard calls. 
-        # It captures the function name and the arguments string inside parentheses.
-        # Updated regex to be more robust:
-        # 1. Matches optional code block markers (```python etc)
-        # 2. Matches tool name
-        # 3. Matches parentheses and content across newlines
-        pattern = r"(add_to_cart|view_cart|save_shipping_details|confirm_order)\s*\(([\s\S]*?)\)"
+        # Tools we are looking for
+        # We scan the text for these keywords followed by '('
+        known_functions = list(tools.keys())
         
-        matches = list(re.finditer(pattern, text))
-        
-        logger.info(f"Scanning response for tools. Text length: {len(text)}. Matches found: {len(matches)}")
-        if not matches and "confirm_order" in text:
-             logger.warning(f"Potential missed tool call in text: {text[:100]}...")
-        
-        # Execute distinct calls (avoid duplicates if repeated?)
         executed_results = []
+        final_text = text
         
-        for match in matches:
-            func_name = match.group(1)
-            args_str = match.group(2)
+        # We will iterate and find all calls
+        # Since we modify final_text (removing calls), we should be careful with indices.
+        # Strategy: Extract all calls first, then execute, then replace in text.
+        
+        calls_to_execute = []
+        
+        # Simple parser loop
+        i = 0
+        while i < len(text):
+            # Check for function names
+            match = None
+            for func_name in known_functions:
+                if text[i:].startswith(func_name + "("):
+                    match = func_name
+                    break
+            
+            if match:
+                # Found a function start at 'i'
+                start_idx = i
+                args_start = i + len(match) + 1 # skip 'func('
+                
+                # Walk forward to find balancing ')'
+                balance = 1
+                j = args_start
+                while j < len(text) and balance > 0:
+                    if text[j] == '(':
+                        balance += 1
+                    elif text[j] == ')':
+                        balance -= 1
+                    j += 1
+                
+                if balance == 0:
+                    # Found complete call
+                    full_call_str = text[start_idx:j]
+                    args_str = text[args_start:j-1]
+                    calls_to_execute.append({
+                        "func_name": match,
+                        "args_str": args_str,
+                        "full_string": full_call_str
+                    })
+                    i = j # Advance past this call
+                    continue
+            
+            i += 1
+
+        logger.info(f"Scanning response for tools. Found: {len(calls_to_execute)}")
+        
+        for call in calls_to_execute:
+            func_name = call["func_name"]
+            args_str = call["args_str"]
+            full_string = call["full_string"]
+            
+            # Remove from user-facing text
+            final_text = final_text.replace(full_string, "").strip()
             
             try:
-                # Prepare arguments
-                # We need to prepend 'phone' if it's not explicitly in the call, 
-                # OR we inspect the args.
-                # The Prompt says `add_to_cart(phone, ...)` so LLM might include it or not.
-                # Let's try to parse args_str as a tuple
-                
-                # Wrap in tuple to parse: (args_str)
-                # If args_str is empty, plain eval might fail, but tools take args.
-                
-                # Safe eval using ast.literal_eval is hard because users might put strings without quotes?
-                # LLM is instructed to write code.
-                
-                # Trick: use eval() but with restricted globals/locals
-                # We can inject 'phone' variable into the context
-                
-                local_scope = {"phone": phone}
-                
-                # If the string is distinct arguments `phone, "Items", 1`, wrapping in `func(...)` and evaling works.
-                # We construct the full call string
-                call_str = f"{func_name}({args_str})"
-                
-                # For safety, we only allow literal values + the 'phone' variable. 
-                # But `add_to_cart` string might be complex.
-                # Let's rely on our specific tools map.
-                
-                # Define a context where tools are available and 'phone' is a variable
+                # Prepare execution context
                 context = tools.copy()
                 context['phone'] = phone
                 
-                # Execute
-                result = eval(call_str, {"__builtins__": {}}, context)
+                # Construct call with the extracted args
+                # We trust the extraction is balanced now
+                call_code = f"{func_name}({args_str})"
                 
-                executed_results.append(f"\n\n⚙️ *System Action*: {result}")
+                logger.info(f"Executing Tool: {call_code}")
+                result = eval(call_code, {"__builtins__": {}}, context)
+                
+                # Append result directly without technical prefix
+                executed_results.append(f"\n\n{result}")
                 
             except Exception as e:
                 logger.error(f"Tool execution failed for {func_name}: {e}")
                 executed_results.append(f"\n\n❌ Action Failed: {str(e)}")
         
-        # If we executed tools, append results to response
-        # Also, maybe strip the tool call string from the user-facing response?
-        # The user might find `add_to_cart(...)` confusing if left in text.
-        
-        final_text = text
-        for match in matches:
-            # Remove the call string from the final text to make it clean
-            final_text = final_text.replace(match.group(0), "").strip()
-            
         if executed_results:
             final_text += "".join(executed_results)
             
