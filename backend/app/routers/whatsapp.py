@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
@@ -8,6 +8,7 @@ from ..database import get_db, ConversationMessage, WhatsAppSession, get_sl_time
 from ..services import RAGService
 from ..services.wasender_service import send_wasender_message_background
 from ..models import WhatsAppMessage
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
 async def handle_wasender_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
+    x_webhook_signature: str = Header(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -26,11 +28,19 @@ async def handle_wasender_webhook(
     Compatible with both legacy and new WASender payload formats.
     """
     try:
+        # Validate Signature
+        expected_signature = os.getenv("WHATSAPP_WEBHOOK_SIGNATURE")
+        if expected_signature:
+            if not x_webhook_signature or x_webhook_signature != expected_signature:
+                logger.warning(f"[Webhook] Invalid signature. Received: {x_webhook_signature}")
+                raise HTTPException(status_code=401, detail="Invalid signature")
+
         payload = await request.json()
         
         # Extract user ID (phone number) and message
         user_id = None
         message_text = None
+        gateway_session_id = payload.get("sessionId") # Get session ID for Bearer token
         
         # Try legacy format
         if "fromNumber" in payload:
@@ -59,7 +69,7 @@ async def handle_wasender_webhook(
         logger.info(f"[Webhook] Received message from {phone_number}: {message[:50]}...")
         
         # Process message properly
-        return await process_message_internal(phone_number, message, db, background_tasks)
+        return await process_message_internal(phone_number, message, db, background_tasks, gateway_session_id)
         
     except Exception as e:
         logger.error(f"[Webhook] Error processing webhook: {str(e)}", exc_info=True)
@@ -70,7 +80,8 @@ async def process_message_internal(
     phone_number: str, 
     message: str, 
     db: Session,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    gateway_session_id: str = None
 ):
     """
     Internal logic to process message and generate response.
@@ -143,7 +154,8 @@ async def process_message_internal(
         send_wasender_message_background,
         phone_number=phone_number,
         message=result["response"],
-        session_id=session_id
+        session_id=session_id,
+        api_token=gateway_session_id
     )
 
     return {

@@ -54,27 +54,30 @@ class WASenderService:
             phone = f"+{phone}"
         return phone
     
-    def _get_headers(self) -> dict:
+    def _get_headers(self, api_token: Optional[str] = None) -> dict:
         """Build request headers with bearer token authentication."""
         headers = {"Content-Type": "application/json"}
-        if self.bearer_token:
-            headers["Authorization"] = f"Bearer {self.bearer_token}"
+        token = api_token or self.bearer_token
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         return headers
     
-    def send_message(self, phone_number: str, message: str) -> bool:
+    def send_message(self, phone_number: str, message: str, api_token: Optional[str] = None) -> bool:
         """
         Send a WhatsApp message via WASenderAPI.
         
         Args:
             phone_number: Recipient phone number (with or without country code)
             message: Text message to send
+            api_token: Optional Bearer token to use for this request
             
         Returns:
             True if message sent successfully, False otherwise
         """
-        if not self.bearer_token:
+        token = api_token or self.bearer_token
+        if not token:
             logger.error(
-                "[WASender] Cannot send message - WHATSAPP_API_BEARER_TOKEN not set"
+                "[WASender] Cannot send message - WHATSAPP_API_BEARER_TOKEN or api_token not set"
             )
             return False
         
@@ -104,7 +107,8 @@ class WASenderService:
             response = requests.post(
                 self.api_url,
                 json=payload,
-                headers=self._get_headers(),
+                json=payload,
+                headers=self._get_headers(api_token),
                 timeout=self.timeout
             )
             
@@ -178,7 +182,8 @@ def get_wasender_service() -> WASenderService:
 def send_wasender_message_background(
     phone_number: str, 
     message: str,
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
+    api_token: Optional[str] = None
 ):
     """
     Background task function for sending WASender messages.
@@ -191,7 +196,7 @@ def send_wasender_message_background(
         session_id: Optional session ID for logging
     """
     service = get_wasender_service()
-    success = service.send_message(phone_number, message)
+    success = service.send_message(phone_number, message, api_token)
     
     if success:
         logger.info(
