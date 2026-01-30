@@ -162,15 +162,28 @@ async def get_dashboard_stat(db: Session = Depends(get_db)):
     # Total Customers (Unique WhatsApp Sessions)
     total_customers = db.query(WhatsAppSession).count()
     
+    import logging
     # Total Items Sold
     total_items_sold = db.query(func.sum(OrderItem.quantity)).scalar() or 0
+
+    # Total Agent Messages (Response Count)
+    try:
+        from ..database import ConversationMessage
+        total_agent_messages = db.query(ConversationMessage).filter(ConversationMessage.role == 'assistant').count()
+        print(f"DEBUG: Counted {total_agent_messages} assistant messages.")
+        from ..database.database import DATABASE_URL
+        print(f"DEBUG: Using DB at {DATABASE_URL}")
+    except Exception as e:
+        print(f"Error counting messages: {e}")
+        total_agent_messages = 0
     
     return {
         "total_orders": total_orders,
         "pending_orders": pending_orders,
         "total_revenue": total_revenue,
         "total_customers": total_customers,
-        "total_items_sold": total_items_sold
+        "total_items_sold": total_items_sold,
+        "total_agent_messages": total_agent_messages
     }
 
 @router.get("/product")
