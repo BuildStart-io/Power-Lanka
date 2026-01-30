@@ -54,6 +54,15 @@
           <div class="stat-label">Items Sold</div>
         </div>
       </div>
+      <div class="stat-card">
+        <div class="stat-icon">
+          <MessageSquare :size="28" />
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ formatNumber(stats.total_agent_messages || 0) }}</div>
+          <div class="stat-label">Response Count</div>
+        </div>
+      </div>
     </div>
     
     <!-- Product and Quick Actions Container -->
@@ -159,7 +168,8 @@ import {
   Users, 
   ShoppingBag, 
   Trash2, 
-  Smartphone 
+  Smartphone,
+  MessageSquare 
 } from 'lucide-vue-next'
 
 export default {
@@ -171,7 +181,8 @@ export default {
     Users,
     ShoppingBag,
     Trash2,
-    Smartphone
+    Smartphone,
+    MessageSquare
   },
   data() {
     return {
@@ -181,7 +192,8 @@ export default {
         pending_orders: 0,
         total_revenue: 0,
         total_customers: 0,
-        total_items_sold: 0
+        total_items_sold: 0,
+        total_agent_messages: 0
       },
       loading: true,
       product: null,

@@ -51,6 +51,7 @@
           <ThemeToggle />
           <div class="profile-menu">
             <button @click="toggleProfileMenu" class="profile-button glass">
+              <span class="role-badge" :class="userRole">{{ userRole }}</span>
               <User :size="20" />
               <span class="profile-name">{{ adminName }}</span>
               <span class="dropdown-arrow">▼</span>
@@ -106,26 +107,14 @@ export default {
     return {
       showProfileMenu: false,
       showMobileMenu: false,
-      loginState: !!localStorage.getItem('admin_token')
+      loginState: false, // Initialize to false, check in created/mounted
+      adminName: 'Admin',
+      userRole: 'staff'
     }
   },
   computed: {
     isLoggedIn() {
       return this.loginState
-    },
-    adminName() {
-      const user = localStorage.getItem('admin_user')
-      return user ? JSON.parse(user).name : 'Admin'
-    },
-    userRole() {
-       const user = localStorage.getItem('admin_user')
-       if (!user) return 'staff'
-       try {
-         const userData = JSON.parse(user)
-         return (userData.role || 'staff').toLowerCase()
-       } catch (e) {
-         return 'staff'
-       }
     }
   },
   watch: {
@@ -137,6 +126,23 @@ export default {
   methods: {
     checkLoginState() {
       this.loginState = !!localStorage.getItem('admin_token')
+      
+      if (this.loginState) {
+        const user = localStorage.getItem('admin_user')
+        if (user) {
+          try {
+            const userData = JSON.parse(user)
+            this.adminName = userData.name || 'Admin'
+            this.userRole = (userData.role || 'staff').toLowerCase()
+          } catch (e) {
+            this.adminName = 'Admin'
+            this.userRole = 'staff'
+          }
+        }
+      } else {
+        this.adminName = ''
+        this.userRole = ''
+      }
     },
     logout() {
       localStorage.removeItem('admin_token')
@@ -212,6 +218,26 @@ export default {
 
 .profile-icon {
   font-size: 1.5rem;
+}
+
+.role-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-right: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.role-badge.admin {
+  background-color: hsl(var(--destructive));
+  color: white;
+}
+
+.role-badge.staff {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
 }
 
 .profile-name {
