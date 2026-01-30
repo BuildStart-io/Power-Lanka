@@ -22,4 +22,5 @@ qdrant-client==1.12.1
 # Utils
 python-dotenv==1.0.1
 pydantic-settings==2.5.2
-passlib[bcrypt]
+passlib==1.7.4
+bcrypt==3.2.2
