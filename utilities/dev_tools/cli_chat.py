@@ -1,246 +1,68 @@
-import os
-import sys
-import uvicorn
 import requests
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from dotenv import load_dotenv
+import json
+import sys
+import time
 
-# Ensure the backend directory is in the path
-# Ensure the backend directory is in the path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(os.path.join(project_root, 'backend'))
+# Configuration
+API_URL = "http://localhost:8000/whatsapp/message"
+DEFAULT_PHONE = "94770000000"
 
-# Load environment variables
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backend/.env")
-if os.path.exists(env_path):
-    load_dotenv(env_path)
-else:
-    load_dotenv()
-
-# Configure Logging to see internal tool logs
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-from app.services.rag_service import RAGService
-from app.routers import (
-    admin_router,
-    admin_products_router,
-    admin_chat_router
-)
-
-from contextlib import asynccontextmanager
-from fastapi.responses import RedirectResponse
-from app.database import SessionLocal, WhatsAppSession, ConversationMessage, get_sl_time
-import uuid
-from datetime import datetime
-
-# Initialize Service
-# Global instance to avoid re-init on every request if expensive
-rag_service = None
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global rag_service
-    print("Initializing RAG Service...")
-    try:
-        # Auto-seed if needed
-        from seed_data import seed_products
+def chat_loop():
+    print("="*50)
+    print("🤖 Power Lanka CLI Chat Client")
+    print("="*50)
+    print(f"Connecting to: {API_URL}")
+    print("Type 'quit' or 'exit' to stop.\n")
+    
+    phone_number = input(f"Enter Phone Number for session (default {DEFAULT_PHONE}): ").strip()
+    if not phone_number:
+        phone_number = DEFAULT_PHONE
+        
+    print(f"\n✅ Session initialized for: {phone_number}\n")
+    
+    while True:
         try:
-            seed_products()
-        except Exception as seed_err:
-            print(f"Seeding ignored or failed: {seed_err}")
-
-        rag_service = RAGService()
-        print("RAG Service Initialized!")
-    except Exception as e:
-        print(f"Failed to initialize RAG Service: {e}")
-    yield
-    # Clean up if needed
-    print("Shutting down RAG Service...")
-
-# Create FastAPI app
-app = FastAPI(title="CLI Chat Server", lifespan=lifespan)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Include Admin Routers
-app.include_router(admin_router)
-app.include_router(admin_products_router)
-app.include_router(admin_chat_router)
-
-@app.get("/")
-async def root():
-    return RedirectResponse(url="/docs")
-
-class Key(BaseModel):
-    cleanedSenderPn: str
-
-class MessageItem(BaseModel):
-    key: Key
-    messageBody: str
-
-class DataPayload(BaseModel):
-    messages: MessageItem
-
-class WebhookPayload(BaseModel):
-    event: str
-    data: DataPayload
-
-@app.post("/chat")
-async def chat_endpoint(payload: WebhookPayload):
-    """
-    Simulates the webhook endpoint.
-    Expects complex JSON structure from WhatsApp gateway.
-    """
-    global rag_service
-    if not rag_service:
-        return {"error": "RAG Service not initialized"}
-    
-    # Extract data from nested structure
-    try:
-        from_number = payload.data.messages.key.cleanedSenderPn
-        message_body = payload.data.messages.messageBody
-    except AttributeError:
-        return {"error": "Invalid payload structure"}
-
-    print(f"\n[POST] Received from {from_number}: {message_body}")
-    
-    # Initialize DB Session
-    db = SessionLocal()
-    response_text = ""
-    try:
-        # Standardize phone number for lookup
-        lookup_number = from_number.strip()
-        
-        # Get or create WhatsApp session
-        wa_session = db.query(WhatsAppSession).filter(WhatsAppSession.phone_number == lookup_number).first()
-        
-        if not wa_session:
-            print(f"[DB] Creating NEW session for {lookup_number}")
-            wa_session = WhatsAppSession(
-                id=str(uuid.uuid4()),
-                phone_number=lookup_number,
-                session_id=str(uuid.uuid4()),
-            )
-            db.add(wa_session)
-            db.commit()
-            db.refresh(wa_session)
-        else:
-            print(f"[DB] Found EXISTING session: {wa_session.session_id}")
-        
-        # Update last message time
-        wa_session.last_message_at = get_sl_time()
-        db.commit()
-
-        # Get conversation history
-        history_msgs = db.query(ConversationMessage).filter(
-            ConversationMessage.session_id == wa_session.session_id
-        ).order_by(ConversationMessage.created_at.asc()).all()
-        
-        print(f"[DB] Loaded {len(history_msgs)} history messages")
-        
-        conversation_history = [{"role": m.role, "content": m.content} for m in history_msgs]
-        
-        # Generate Response
-        # Note: rag_service tools (add_to_cart) create their own DB storage. 
-        # They need the correct phone number to look up this SAME session.
-        response_data = rag_service.generate_response(
-            query=message_body,
-            conversation_history=conversation_history,
-            phone_number=lookup_number
-        )
-        
-        response_text = response_data.get("response", "")
-        print(f"[RESP] Bot: {response_text}")
-        
-        # Save messages to DB
-        user_msg = ConversationMessage(
-            id=str(uuid.uuid4()),
-            session_id=wa_session.session_id,
-            role="user",
-            content=message_body
-        )
-        db.add(user_msg)
-        
-        assistant_msg = ConversationMessage(
-            id=str(uuid.uuid4()),
-            session_id=wa_session.session_id,
-            role="assistant",
-            content=response_text
-        )
-        db.add(assistant_msg)
-        db.commit()
-        print("[DB] Saved chat messages committed.")
-
-    except Exception as e:
-        print(f"Database Error: {e}")
-        import traceback
-        traceback.print_exc()
-        # Fallback if DB fails
-        response_data = rag_service.generate_response(
-            query=message_body,
-            conversation_history=[],
-            phone_number=from_number
-        )
-        response_text = response_data.get("response", "")
-    finally:
-        db.close()
-
-    # Send response to WhatsApp via WASender API
-    wa_api_url = "https://wasenderapi.com/api/send-message"
-    wa_token = os.getenv("WASENDER_TOKEN")
-    
-    if not wa_token:
-        print("WASENDER_TOKEN not found in environment variables.")
-        return {
-            "response": response_text,
-            "request_body": message_body,
-            "error": "WASENDER_TOKEN missing"
-        }
-    
-    headers = {
-        "Authorization": f"Bearer {wa_token}",
-        "Content-Type": "application/json"
-    }
-    
-    # Ensure phone number has '+' prefix
-    formatted_number = from_number if from_number.startswith("+") else f"+{from_number}"
-
-    json_data = {
-        "to": formatted_number,
-        "text": response_text
-    }
-    
-    try:
-        print(f"Sending response to {from_number} via WASender...")
-        wa_response = requests.post(wa_api_url, headers=headers, json=json_data)
-        print(f"WASender Response: {wa_response.status_code} - {wa_response.text}")
-    except Exception as e:
-        print(f"Failed to send to WASender: {e}")
-    
-    return {
-        "response": response_text,
-        "request_body": message_body
-    }
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+            user_input = input("You > ").strip()
+            if user_input.lower() in ['quit', 'exit']:
+                break
+            if not user_input:
+                continue
+                
+            # Prepare Payload
+            payload = {
+                "phone_number": phone_number,
+                "message": user_input
+            }
+            
+            # Send Request
+            try:
+                # Show loading indicator
+                sys.stdout.write("Bot is thinking...")
+                sys.stdout.flush()
+                
+                response = requests.post(API_URL, json=payload)
+                sys.stdout.write("\r" + " "*20 + "\r") # Clear loading text
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    bot_reply = data.get("response", "No response text")
+                    print(f"Bot > {bot_reply}\n")
+                    
+                    if data.get("category_image"):
+                        print(f"[Details] Image suggested: {data.get('category_image')}\n")
+                else:
+                    print(f"\n[Error] Server returned {response.status_code}: {response.text}\n")
+                    
+            except requests.exceptions.ConnectionError:
+                sys.stdout.write("\r" + " "*20 + "\r")
+                print("\n[Error] Could not connect to backend at localhost:8000. Is the server running?\n")
+            except Exception as e:
+                sys.stdout.write("\r" + " "*20 + "\r")
+                print(f"\n[Error] {e}\n")
+                
+        except KeyboardInterrupt:
+            print("\nExiting...")
+            break
 
 if __name__ == "__main__":
-    print("Starting Setup Server on port 8000...")
-    print("Swagger Docs available at: http://localhost:8000/docs")
-    print("Send POST requests to: http://localhost:8000/chat")
-    # Run on 8000 to match docker-compose configuration
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    chat_loop()
