@@ -107,7 +107,6 @@ class WASenderService:
             response = requests.post(
                 self.api_url,
                 json=payload,
-                json=payload,
                 headers=self._get_headers(api_token),
                 timeout=self.timeout
             )
