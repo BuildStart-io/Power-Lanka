@@ -10,8 +10,17 @@ from fastapi.responses import StreamingResponse
 
 from ..database import get_db, User, Product, Order, OrderItem, WhatsAppSession, get_sl_time
 from ..database.database import format_price
+from passlib.context import CryptContext
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 @router.get("/ping")
 async def ping():
@@ -41,10 +50,9 @@ class UserResponse(BaseModel):
 @router.post("/login")
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """Simple admin login - verifies email and password."""
-    # In a real app, use bcrypt to check password_hash
     user = db.query(User).filter(User.email == request.email).first()
     
-    if not user or user.password_hash != request.password:
+    if not user or not verify_password(request.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
@@ -75,7 +83,7 @@ async def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     new_user = User(
         id=str(uuid.uuid4()),
         email=user_data.email,
-        password_hash=user_data.password, # For production, hash this
+        password_hash=get_password_hash(user_data.password),
         full_name=user_data.full_name,
         role=user_data.role
     )
@@ -113,7 +121,7 @@ async def update_user_password(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    user.password_hash = data.password
+    user.password_hash = get_password_hash(data.password)
     db.commit()
     return {"message": "Password updated successfully"}
 
