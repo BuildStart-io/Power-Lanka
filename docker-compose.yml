@@ -15,7 +15,11 @@ services:
       - UPLOAD_DIR=/app/uploads
       - DATA_DIR=/app/data
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-5}
-      - WASENDER_TOKEN=${WASENDER_TOKEN}
+      - WHATSAPP_API_BEARER_TOKEN=${WASENDER_TOKEN}
+      - WHATSAPP_WEBHOOK_SIGNATURE=${WHATSAPP_WEBHOOK_SIGNATURE}
+      - WASENDER_API_URL=${WASENDER_API_URL}
+      - WASENDER_DEVICE_ID=${WASENDER_DEVICE_ID}
+      - WASENDER_TIMEOUT=${WASENDER_TIMEOUT:-10}
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads

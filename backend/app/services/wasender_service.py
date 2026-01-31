@@ -32,9 +32,22 @@ class WASenderService:
         self.timeout = int(os.getenv("WASENDER_TIMEOUT", "10"))
         self.device_id = os.getenv("WASENDER_DEVICE_ID")
         
-        if not self.bearer_token:
-            logger.warning(
-                "WHATSAPP_API_BEARER_TOKEN not set - WASender messages will fail"
+        # Debug logging for configuration
+        logger.info("[WASender] Initializing WASender service")
+        logger.info(f"[WASender] API URL: {self.api_url}")
+        logger.info(f"[WASender] Device ID: {self.device_id or 'Not set'}")
+        logger.info(f"[WASender] Timeout: {self.timeout}s")
+        
+        if self.bearer_token:
+            # Mask the token for security - show first 6 and last 4 chars
+            masked_token = f"{self.bearer_token[:6]}...{self.bearer_token[-4:]}" if len(self.bearer_token) > 10 else "***"
+            logger.info(f"[WASender] Bearer Token: {masked_token} (length: {len(self.bearer_token)})")
+        else:
+            logger.error(
+                "[WASender] ❌ WHATSAPP_API_BEARER_TOKEN not set - WASender messages will fail!"
+            )
+            logger.error(
+                "[WASender] Please ensure WHATSAPP_API_BEARER_TOKEN is set in your environment"
             )
     
     def _format_phone_number(self, phone_number: str) -> str:
@@ -104,10 +117,19 @@ class WASenderService:
             logger.info(f"[WASender] Sending message to {payload['to']}")
             logger.debug(f"[WASender] URL: {self.api_url}")
             
+            # Mask token in headers for logging
+            headers = self._get_headers(api_token)
+            masked_headers = headers.copy()
+            if 'Authorization' in masked_headers:
+                auth_value = masked_headers['Authorization']
+                if len(auth_value) > 20:
+                    masked_headers['Authorization'] = f"{auth_value[:13]}...{auth_value[-4:]}"
+            logger.debug(f"[WASender] Headers: {masked_headers}")
+            
             response = requests.post(
                 self.api_url,
                 json=payload,
-                headers=self._get_headers(api_token),
+                headers=headers,
                 timeout=self.timeout
             )
             
@@ -116,11 +138,24 @@ class WASenderService:
                     f"[WASender] ✅ Message sent successfully (HTTP {response.status_code})"
                 )
                 return True
+            elif response.status_code == 401:
+                logger.error(
+                    f"[WASender] ❌ Authentication failed (HTTP 401) - Invalid API key!"
+                )
+                logger.error(f"[WASender] Response: {response.text}")
+                logger.error(
+                    "[WASender] Please check:\n"
+                    "  1. WHATSAPP_API_BEARER_TOKEN in .env file is correct\n"
+                    "  2. No extra spaces/quotes around the token\n"
+                    "  3. Token hasn't expired or been revoked\n"
+                    "  4. You've restarted the Docker container after changing .env"
+                )
+                return False
             else:
                 logger.warning(
                     f"[WASender] ⚠️ Unexpected status code: {response.status_code}"
                 )
-                logger.warning(f"[WASender] Response: {response.text[:200]}")
+                logger.warning(f"[WASender] Response: {response.text}")
                 return False
                 
         except requests.exceptions.Timeout:
