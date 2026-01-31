@@ -115,16 +115,32 @@ class WASenderService:
         
         try:
             logger.info(f"[WASender] Sending message to {payload['to']}")
-            logger.debug(f"[WASender] URL: {self.api_url}")
             
-            # Mask token in headers for logging
+            # Get headers
             headers = self._get_headers(api_token)
+            
+            # DETAILED DEBUG LOGGING
+            logger.info(f"[WASender] 🔍 DEBUG - Full request details:")
+            logger.info(f"[WASender] 🔍 URL: {self.api_url}")
+            logger.info(f"[WASender] 🔍 URL type: {type(self.api_url)}")
+            logger.info(f"[WASender] 🔍 URL repr: {repr(self.api_url)}")
+            logger.info(f"[WASender] 🔍 Payload: {payload}")
+            logger.info(f"[WASender] 🔍 Payload type: {type(payload)}")
+            
+            # Log headers with masking
             masked_headers = headers.copy()
             if 'Authorization' in masked_headers:
                 auth_value = masked_headers['Authorization']
                 if len(auth_value) > 20:
-                    masked_headers['Authorization'] = f"{auth_value[:13]}...{auth_value[-4:]}"
-            logger.debug(f"[WASender] Headers: {masked_headers}")
+                    masked_headers['Authorization'] = f"{auth_value[:20]}...{auth_value[-4:]}"
+            logger.info(f"[WASender] 🔍 Headers: {masked_headers}")
+            
+            # Log the exact token being used (first 10 and last 10 chars)
+            token = api_token or self.bearer_token
+            if token:
+                logger.info(f"[WASender] 🔍 Token (first 10): {token[:10]}")
+                logger.info(f"[WASender] 🔍 Token (last 10): {token[-10:]}")
+                logger.info(f"[WASender] 🔍 Token length: {len(token)}")
             
             response = requests.post(
                 self.api_url,
@@ -132,6 +148,11 @@ class WASenderService:
                 headers=headers,
                 timeout=self.timeout
             )
+            
+            # Log response details
+            logger.info(f"[WASender] 🔍 Response status: {response.status_code}")
+            logger.info(f"[WASender] 🔍 Response headers: {dict(response.headers)}")
+            logger.info(f"[WASender] 🔍 Response body: {response.text}")
             
             if response.status_code in [200, 201]:
                 logger.info(
