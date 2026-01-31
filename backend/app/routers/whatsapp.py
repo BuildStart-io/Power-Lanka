@@ -158,7 +158,6 @@ async def process_message_internal(
         phone_number=phone_number,
         message=result["response"],
         session_id=session_id,
-        session_id=session_id
         # api_token=gateway_session_id  # Do not use webhook session ID as API token!
     )
 
