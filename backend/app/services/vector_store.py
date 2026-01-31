@@ -13,6 +13,16 @@ class VectorStoreService:
 
     def __init__(self):
         settings = get_settings()
+        # Log connection attempt with masked key
+        masked_key = (
+            f"{settings.qdrant_api_key[:5]}...{settings.qdrant_api_key[-5:]}"
+            if settings.qdrant_api_key
+            else "None"
+        )
+        print(f"Connecting to Qdrant at: {settings.qdrant_url}")
+        print(f"Collection: {settings.qdrant_collection_name}")
+        print(f"API Key: {masked_key}")
+
         self.client = QdrantClient(
             url=settings.qdrant_url,
             api_key=settings.qdrant_api_key,
@@ -21,12 +31,14 @@ class VectorStoreService:
         self.collection_name = settings.qdrant_collection_name
         self.embedding_service = EmbeddingService()
         self._ensure_collection()
+        print("Successfully connected to vector database")
 
     def _ensure_collection(self):
         """Create collection if it doesn't exist (idempotent)."""
         try:
-            # Use explicit exists check - more reliable than try/catch
+            # Check if collection exists
             if not self.client.collection_exists(self.collection_name):
+                print(f"Collection '{self.collection_name}' not found. Creating...")
                 self.client.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=qdrant_models.VectorParams(
@@ -34,7 +46,18 @@ class VectorStoreService:
                         distance=qdrant_models.Distance.COSINE,
                     ),
                 )
+                print(f"Collection '{self.collection_name}' created successfully")
         except UnexpectedResponse as e:
+            # Handle 403 Forbidden specifically
+            if e.status_code == 403:
+                print(
+                    "\n\033[91mERROR: Qdrant 403 Forbidden.\033[0m\n"
+                    "This usually means your API Key is invalid or not allowed to access/create this collection.\n"
+                    f"configured collection: '{self.collection_name}'\n"
+                    "Please check your QDRANT_API_KEY and QDRANT_COLLECTION_NAME in .env\n"
+                )
+                raise
+            
             # Handle race condition: collection created between check and create
             if "already exists" in str(e):
                 pass  # Collection exists, safe to continue
